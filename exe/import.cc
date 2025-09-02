@@ -105,11 +105,11 @@ int main(int ac, char** av) {
     return 1;
   }
 
-  auto assistance = std::unique_ptr<assistance_times>{};
+  auto assistance = std::unique_ptr<assistance_times_data>{};
   if (vm.contains("assistance_times")) {
     auto const f = cista::mmap{assistance_path.generic_string().c_str(),
                                cista::mmap::protection::READ};
-    assistance = std::make_unique<assistance_times>(read_assistance(f.view()));
+    assistance = std::make_unique<assistance_times_data>(read_assistance(f.view()));
   }
 
   auto shapes = std::unique_ptr<shapes_storage>{};

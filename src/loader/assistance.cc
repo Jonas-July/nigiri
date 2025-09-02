@@ -11,7 +11,10 @@
 
 namespace nigiri::loader {
 
-assistance_times read_assistance(std::string_view file_content) {
+assistance_times::assistance_times(assistance_times_data const* assist)
+    : assist_{assist} {}
+
+assistance_times_data read_assistance(std::string_view file_content) {
   struct assistance {
     utl::csv_col<utl::cstr, UTL_NAME("name")> name_;
     utl::csv_col<double, UTL_NAME("lat")> lat_;
@@ -19,7 +22,7 @@ assistance_times read_assistance(std::string_view file_content) {
     utl::csv_col<utl::cstr, UTL_NAME("time")> time_;
   };
 
-  auto a = assistance_times{};
+  auto a = assistance_times_data{};
   utl::line_range{utl::make_buf_reader(file_content)}  //
       | utl::csv<assistance>()  //
       | utl::for_each([&](assistance const& x) {

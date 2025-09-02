@@ -28,7 +28,7 @@ struct timetable_source {
 timetable load(std::vector<timetable_source> const&,
                finalize_options const&,
                interval<date::sys_days> const&,
-               assistance_times* = nullptr,
+               assistance_times_data* = nullptr,
                shapes_storage* = nullptr,
                bool ignore = false);
 

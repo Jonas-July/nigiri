@@ -26,7 +26,7 @@ std::vector<std::unique_ptr<loader_interface>> get_loaders() {
 timetable load(std::vector<timetable_source> const& sources,
                finalize_options const& finalize_opt,
                interval<date::sys_days> const& date_range,
-               assistance_times* a,
+               assistance_times_data* assist,
                shapes_storage* shapes,
                bool ignore) {
   auto const loaders = get_loaders();
@@ -37,6 +37,7 @@ timetable load(std::vector<timetable_source> const& sources,
 
   auto bitfields = hash_map<bitfield, bitfield_idx_t>{};
   for (auto const [idx, in] : utl::enumerate(sources)) {
+    auto a = assist != nullptr ? std::make_unique<assistance_times>(assistance_times(assist)) : nullptr;
     auto const& [tag, path, local_config] = in;
     auto const is_in_memory = path.starts_with("\n#");
     auto const src = source_idx_t{idx};
@@ -53,7 +54,7 @@ timetable load(std::vector<timetable_source> const& sources,
       auto const progress_tracker = utl::get_active_progress_tracker();
       progress_tracker->context(std::string{tag});
       try {
-        (*it)->load(local_config, src, *dir, tt, bitfields, a, shapes);
+        (*it)->load(local_config, src, *dir, tt, bitfields, a.get(), shapes);
       } catch (std::exception const& e) {
         throw utl::fail("failed to load {}: {}", path, e.what());
       }
