@@ -1,4 +1,5 @@
 #include <cassert>
+#include <chrono>
 
 #include "nigiri/loader/load.h"
 
@@ -15,6 +16,7 @@
 #include "nigiri/loader/netex/loader.h"
 #include "nigiri/shapes_storage.h"
 #include "nigiri/timetable.h"
+#include "nigiri/types.h"
 
 namespace fs = std::filesystem;
 
@@ -31,6 +33,14 @@ std::vector<std::unique_ptr<loader_interface>> get_loaders() {
   return loaders;
 }
 
+using last_write_time_t = cista::strong<std::int64_t, struct _last_write_time>;
+using source_path_t = cista::basic_string<char const*>;
+
+struct change_detector {
+  vector_map<source_idx_t, source_path_t> source_paths;
+  vector_map<source_idx_t, last_write_time_t> last_write_times;
+};
+
 timetable load(std::vector<timetable_source> const& sources,
                finalize_options const& finalize_opt,
                interval<date::sys_days> const& date_range,
@@ -39,6 +49,19 @@ timetable load(std::vector<timetable_source> const& sources,
                bool ignore) {
   auto const loaders = get_loaders();
   auto cache_path = fs::path{"cache"};
+
+  fs::create_directories(cache_path);
+  auto chg = change_detector{};
+  for (auto const& in : sources) {
+    auto const& [tag, path, local_config] = in;
+
+    auto const last_write_time = fs::last_write_time(path);
+    auto const timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                     std::chrono::file_clock::to_sys(last_write_time).time_since_epoch()).count();
+    chg.source_paths.emplace_back(path);
+    chg.last_write_times.emplace_back(last_write_time_t{timestamp});
+  }
+  cista::write(cache_path / "meta.bin", chg);
 
   auto tt = timetable{};
   tt.date_range_ = date_range;
