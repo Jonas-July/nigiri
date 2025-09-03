@@ -1,8 +1,11 @@
+#include <cassert>
+
 #include "nigiri/loader/load.h"
 
 #include "fmt/std.h"
 
 #include "utl/enumerate.h"
+#include "utl/get_or_create.h"
 #include "utl/progress_tracker.h"
 
 #include "nigiri/loader/dir.h"
@@ -55,6 +58,15 @@ timetable load(std::vector<timetable_source> const& sources,
       }
       auto const progress_tracker = utl::get_active_progress_tracker();
       progress_tracker->context(std::string{tag});
+      auto bitfields_check = hash_map<bitfield, bitfield_idx_t>{};
+      for (auto const [idx_, bf] : utl::enumerate(tt.bitfields_)) {
+        auto new_idx = utl::get_or_create(
+          bitfields_check, bf, [&]() { return idx_; });
+        assert(new_idx == idx_); // bitfields must be unique in the timetable
+      }
+      for (auto const [idx_, bf] : utl::enumerate(tt.bitfields_)) {
+        assert(bitfields_check[bf] == bitfields[bf]);
+      }
       try {
         (*it)->load(local_config, src, *dir, tt, bitfields, a, shapes);
       } catch (std::exception const& e) {
