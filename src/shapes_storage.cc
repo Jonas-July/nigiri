@@ -37,6 +37,24 @@ cista::mmap shapes_storage::mm(char const* file) {
   return cista::mmap{(p_ / file).generic_string().c_str(), mode_};
 }
 
+void shapes_storage::add(shapes_storage* other) {
+  for (auto e : other->data_) {
+    this->data_.emplace_back(e);
+  }
+  for (auto e : other->offsets_) {
+    this->offsets_.emplace_back(e);
+  }
+  for (auto e : other->trip_offset_indices_) {
+    this->trip_offset_indices_.emplace_back(e);
+  }
+  for (auto e : other->route_bboxes_) {
+    this->route_bboxes_.emplace_back(e);
+  }
+  for (auto e : other->route_segment_bboxes_) {
+    this->route_segment_bboxes_.emplace_back(e);
+  }
+}
+
 std::pair<std::span<geo::latlng const>, shape_offset_idx_t> get_shape(
     shapes_storage const& storage, trip_idx_t const trip_idx) {
   if (trip_idx == trip_idx_t::invalid() ||
