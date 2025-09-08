@@ -149,12 +149,15 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.source_file_names_ = old_source_file_names;
       auto const old_trip_debug = tt.trip_debug_;
       tt.trip_debug_ = old_trip_debug;
+      auto const old_languages = tt.languages_;
+      tt.languages_ = old_languages;
       /* Prepare timetable by emptying corrected fields */
       tt.bitfields_.reset();
       auto bitfields = hash_map<bitfield, bitfield_idx_t>{};
       tt.src_end_date_.reset();
       tt.source_file_names_.clear();
       tt.trip_debug_ = mutable_fws_multimap<trip_idx_t, trip_debug>{};
+      tt.languages_.clear();
       /* Load file */
       try {
         (*it)->load(local_config, src, *dir, tt, bitfields, a, shapes);
@@ -174,6 +177,7 @@ timetable load(std::vector<timetable_source> const& sources,
       auto new_source_end_date = tt.src_end_date_;
       auto new_source_file_names = tt.source_file_names_;
       auto new_trip_debug = tt.trip_debug_;
+      auto new_languages = tt.languages_;
       /* Restore old timetable */
       tt.bitfields_ = old_bitfields;
       tt.transport_traffic_days_ = old_transport_traffic_days_;
@@ -181,6 +185,7 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.src_end_date_ = old_source_end_date;
       tt.source_file_names_ = old_source_file_names;
       tt.trip_debug_ = old_trip_debug;
+      tt.languages_ = old_languages;
       /* Add new data and adjust references */
       /*	bitfields	*/
       auto corrected_indices = vector_map<bitfield_idx_t, bitfield_idx_t>{};
@@ -209,6 +214,10 @@ timetable load(std::vector<timetable_source> const& sources,
           auto debug = trip_debug{j.source_file_idx_ + source_file_names_offset, j.line_number_from_, j.line_number_to_};
           entry.emplace_back(debug);
         }
+      }
+      /*	 languages	*/
+      for (auto i : new_languages) {
+        tt.languages_.emplace_back(i);
       }
 
       /* Save snapshot */
