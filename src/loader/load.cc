@@ -145,10 +145,16 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.flex_transport_traffic_days_ = old_flex_transport_traffic_days_;
       auto const old_source_end_date = tt.src_end_date_;
       tt.src_end_date_ = old_source_end_date;
+      auto const old_source_file_names = tt.source_file_names_;
+      tt.source_file_names_ = old_source_file_names;
+      auto const old_trip_debug = tt.trip_debug_;
+      tt.trip_debug_ = old_trip_debug;
       /* Prepare timetable by emptying corrected fields */
       tt.bitfields_.reset();
       auto bitfields = hash_map<bitfield, bitfield_idx_t>{};
       tt.src_end_date_.reset();
+      tt.source_file_names_.clear();
+      tt.trip_debug_ = mutable_fws_multimap<trip_idx_t, trip_debug>{};
       /* Load file */
       try {
         (*it)->load(local_config, src, *dir, tt, bitfields, a, shapes);
@@ -166,11 +172,15 @@ timetable load(std::vector<timetable_source> const& sources,
         new_flex_transport_traffic_days_.push_back(tt.flex_transport_traffic_days_[flex_transport_idx_t{i}]);
       }
       auto const new_source_end_date = tt.src_end_date_;
+      auto const new_source_file_names = tt.source_file_names_;
+      auto const new_trip_debug = tt.trip_debug_;
       /* Restore old timetable */
       tt.bitfields_ = old_bitfields;
       tt.transport_traffic_days_ = old_transport_traffic_days_;
       tt.flex_transport_traffic_days_ = old_flex_transport_traffic_days_;
       tt.src_end_date_ = old_source_end_date;
+      tt.source_file_names_ = old_source_file_names;
+      tt.trip_debug_ = old_trip_debug;
       /* Add new data and adjust references */
       /*	bitfields	*/
       auto corrected_indices = vector_map<bitfield_idx_t, bitfield_idx_t>{};
@@ -185,8 +195,24 @@ timetable load(std::vector<timetable_source> const& sources,
       for (auto const& i : new_flex_transport_traffic_days_) {
         tt.flex_transport_traffic_days_.push_back(corrected_indices[i]);
       }
+      /*	 sources	*/
       for (auto const& i : new_source_end_date) {
         tt.src_end_date_.push_back(i);
+      }
+      auto const source_file_names_offset = source_file_idx_t{tt.source_file_names_.size()};
+      for (auto const& i : new_source_file_names) {
+        tt.source_file_names_.emplace_back(i);
+      }
+      for (auto const& i : new_trip_debug) {
+        auto entry = tt.trip_debug_.emplace_back();
+        for (auto const& j : i) {
+          auto debug = trip_debug{j.source_file_idx_ != source_file_idx_t::invalid() ? j.source_file_idx_ + source_file_names_offset
+                                                                                     : source_file_idx_t::invalid(),
+                                  j.line_number_from_,
+                                  j.line_number_to_
+                                 };
+          entry.emplace_back(debug);
+        }
       }
 
       /* Save snapshot */
