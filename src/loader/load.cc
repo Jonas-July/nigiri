@@ -149,8 +149,24 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.source_file_names_ = old_source_file_names;
       auto const old_trip_debug = tt.trip_debug_;
       tt.trip_debug_ = old_trip_debug;
+      auto const old_route_location_seq = tt.route_location_seq_;
+      tt.route_location_seq_ = old_route_location_seq;
       auto const old_languages = tt.languages_;
       tt.languages_ = old_languages;
+      auto const old_locations = tt.locations_;
+      tt.locations_ = old_locations;
+      auto const old_location_routes = tt.location_routes_;
+      tt.location_routes_ = old_location_routes;
+      auto const old_providers = tt.providers_;
+      tt.providers_ = old_providers;
+      auto const old_fares = tt.fares_;
+      tt.fares_ = old_fares;
+      auto const old_location_areas = tt.location_areas_;
+      tt.location_areas_ = old_location_areas;
+      auto const old_location_location_groups = tt.location_location_groups_;
+      tt.location_location_groups_ = old_location_location_groups;
+      auto const old_location_group_locations = tt.location_group_locations_;
+      tt.location_group_locations_ = old_location_group_locations;
       /* Prepare timetable by emptying corrected fields */
       tt.bitfields_.reset();
       auto bitfields = hash_map<bitfield, bitfield_idx_t>{};
@@ -158,6 +174,13 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.source_file_names_.clear();
       tt.trip_debug_ = mutable_fws_multimap<trip_idx_t, trip_debug>{};
       tt.languages_.clear();
+      tt.locations_ = timetable::locations{};
+      tt.location_routes_.clear();
+      tt.location_areas_.clear();
+      tt.location_location_groups_.clear();
+      //tt.fwd_search_lb_graph_ not used during loading
+      //tt.bwd_search_lb_graph_ not used during loading
+      //tt.flex_area_locations not used during loading
       /* Load file */
       try {
         (*it)->load(local_config, src, *dir, tt, bitfields, a, shapes);
@@ -177,7 +200,32 @@ timetable load(std::vector<timetable_source> const& sources,
       auto new_source_end_date = tt.src_end_date_;
       auto new_source_file_names = tt.source_file_names_;
       auto new_trip_debug = tt.trip_debug_;
+      auto new_route_location_seq = vecvec<route_idx_t, stop::value_type>{};
+      for (auto idx = old_route_location_seq.size(); idx < tt.route_location_seq_.size(); ++idx) {
+        auto vec = new_route_location_seq.add_back_sized(0U);
+        for (auto j : tt.route_location_seq_[route_idx_t{idx}]) {
+            vec.push_back(j);
+        }
+      }
       auto new_languages = tt.languages_;
+      auto new_locations = tt.locations_;
+      auto new_location_routes = tt.location_routes_;
+      auto new_providers = vector_map<provider_idx_t, provider>{};
+      for (auto i = old_providers.size(); i < tt.providers_.size(); ++i) {
+        new_providers.push_back(tt.providers_[provider_idx_t{i}]);
+      }
+      // last fares are new
+      auto new_fares = vector_map<source_idx_t, fares>{};
+      new_fares.push_back(tt.fares_[src]);
+      auto new_location_areas = tt.location_areas_;
+      auto new_location_location_groups = tt.location_location_groups_;
+      auto new_location_group_locations = paged_vecvec<location_group_idx_t, location_idx_t>{};
+      for (auto i = old_location_group_locations.size(); i < tt.location_group_locations_.size(); ++i) {
+        new_location_group_locations.emplace_back_empty();
+        for (auto j : tt.location_group_locations_[location_group_idx_t{i}]) {
+            new_location_group_locations.back().push_back(j);
+        }
+      }
       /* Restore old timetable */
       tt.bitfields_ = old_bitfields;
       tt.transport_traffic_days_ = old_transport_traffic_days_;
@@ -185,7 +233,15 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.src_end_date_ = old_source_end_date;
       tt.source_file_names_ = old_source_file_names;
       tt.trip_debug_ = old_trip_debug;
+      tt.route_location_seq_ = old_route_location_seq;
       tt.languages_ = old_languages;
+      tt.locations_ = old_locations;
+      tt.location_routes_ = old_location_routes;
+      tt.providers_ = old_providers;
+      tt.fares_ = old_fares;
+      tt.location_areas_ = old_location_areas;
+      tt.location_location_groups_ = old_location_location_groups;
+      tt.location_group_locations_ = old_location_group_locations;
       /* Add new data and adjust references */
       /*	bitfields	*/
       auto corrected_indices = vector_map<bitfield_idx_t, bitfield_idx_t>{};
@@ -216,10 +272,148 @@ timetable load(std::vector<timetable_source> const& sources,
         }
       }
       /*	 languages	*/
+      auto const language_offset = language_idx_t{tt.languages_.size()};
       for (auto i : new_languages) {
         tt.languages_.emplace_back(i);
       }
-
+      /*       location_idx_t	*/
+      // fwd_search_lb_graph_ and bwd_search_lb_graph_ aren't filled during import
+      auto const locations_offset = location_idx_t{tt.n_locations()};
+      auto const alt_name_idx_offset = alt_name_idx_t{tt.locations_.alt_name_strings_.size()};
+      auto const timezones_offset = timezone_idx_t{tt.locations_.timezones_.size()};
+      {// merge locations struct
+        auto&& loc = tt.locations_;
+        for (auto i : new_locations.location_id_to_idx_) {
+          auto loc_id = i.first;
+          auto loc_idx = i.second + locations_offset;
+          auto const [it, is_new] = loc.location_id_to_idx_.emplace(loc_id, loc_idx);
+          if (!is_new) {
+            log(log_lvl::error, "loader.load", "duplicate station {}", loc_id.id_);
+          }
+        }
+        for (auto i : new_locations.names_) {
+          loc.names_.emplace_back(i);
+        }
+        for (auto i : new_locations.platform_codes_) {
+          loc.platform_codes_.emplace_back(i);
+        }
+        for (auto i : new_locations.descriptions_) {
+          loc.descriptions_.emplace_back(i);
+        }
+        for (auto i : new_locations.ids_) {
+          loc.ids_.emplace_back(i);
+        }
+        for (auto i : new_locations.alt_names_) {
+          auto vec = loc.alt_names_.add_back_sized(0U);
+          for (auto j : i) {
+            vec.push_back(j + alt_name_idx_offset);
+          }
+        }
+        for (auto i: new_locations.coordinates_) {
+          loc.coordinates_.push_back(i);
+        }
+        for (auto i: new_locations.src_) {
+          loc.src_.push_back(i);
+        }
+        for (auto i: new_locations.transfer_time_) {
+          loc.transfer_time_.push_back(i);
+        }
+        for (auto i: new_locations.types_) {
+          loc.types_.push_back(i);
+        }
+        for (auto i: new_locations.parents_) {
+          loc.parents_.push_back(i + locations_offset);
+        }
+        for (auto i: new_locations.location_timezones_) {
+          loc.location_timezones_.push_back(i + timezones_offset);
+        }
+        for (auto i : new_locations.equivalences_) {
+          auto entry = loc.equivalences_.emplace_back();
+          for (auto j : i) {
+            auto loc_idx = j + locations_offset;
+            entry.emplace_back(loc_idx);
+          }
+        }
+        for (auto i : new_locations.children_) {
+          auto entry = loc.children_.emplace_back();
+          for (auto j : i) {
+            auto loc_idx = j + locations_offset;
+            entry.emplace_back(loc_idx);
+          }
+        }
+        for (auto i : new_locations.preprocessing_footpaths_out_) {
+          auto entry = loc.preprocessing_footpaths_out_.emplace_back();
+          for (auto j : i) {
+            auto fp = footpath{j.target() + locations_offset, j.duration()};
+            entry.emplace_back(fp);
+          }
+        }
+        for (auto i : new_locations.preprocessing_footpaths_in_) {
+          auto entry = loc.preprocessing_footpaths_in_.emplace_back();
+          for (auto j : i) {
+            auto fp = footpath{j.target() + locations_offset, j.duration()};
+            entry.emplace_back(fp);
+          }
+        }
+        /*
+          loc.footpaths_out_ and loc.footpaths_in_ don't get used during loading
+          and are thus skipped
+        */
+        for (auto i: new_locations.timezones_) {
+          loc.timezones_.push_back(i);
+        }
+        /*
+          loc.location_importance_ doesn't get used during loading and is thus skipped
+        */
+        for (auto i : new_locations.alt_name_strings_) {
+          loc.alt_name_strings_.emplace_back(i);
+        }
+        for (auto i: new_locations.alt_name_langs_) {
+          loc.alt_name_langs_.push_back(i + language_offset);
+        }
+        /*
+          loc.max_importance_ and loc.rtree_ don't get used during loading
+          and are thus skipped
+        */
+      } // end of locations struct
+      for (auto i : new_location_routes) {
+        tt.location_routes_.emplace_back(i);
+      }
+      for (auto i : new_location_areas) {
+        tt.location_areas_.emplace_back(i);
+      }
+      for (auto i : new_location_location_groups) {
+        tt.location_location_groups_.emplace_back(i);
+      }
+      for (location_group_idx_t i = location_group_idx_t{0}; i < location_group_idx_t{new_location_group_locations.size()}; ++i) {
+        tt.location_group_locations_.emplace_back_empty();
+        for (auto j : new_location_group_locations[location_group_idx_t{i}]) {
+          tt.location_group_locations_.back().push_back(j + locations_offset);
+        }
+      }
+      /*        route_idx_t	*/
+      for (auto i : new_route_location_seq) {
+        auto vec = tt.route_location_seq_.add_back_sized(0U);
+        for (auto j : i) {
+          vec.push_back(to_idx(location_idx_t{j} + locations_offset));
+        }
+      }
+      /*          fares		*/
+      for (auto i : new_fares) {
+        auto new_fare_leg_join_rules = vector<fares::fare_leg_join_rule>{};
+        for (auto j : i.fare_leg_join_rules_) {
+          j.from_stop_ = j.from_stop_ + locations_offset;
+          j.to_stop_ = j.to_stop_ + locations_offset;
+          new_fare_leg_join_rules.push_back(j);
+        }
+        i.fare_leg_join_rules_ = new_fare_leg_join_rules;
+        tt.fares_.push_back(i);
+      }
+      /*      provider_idx_t	*/
+      for (auto i : new_providers) {
+        i.tz_ = i.tz_ + timezones_offset;
+        tt.providers_.push_back(i);
+      }
       /* Save snapshot */
       fs::create_directories(local_cache_path);
       if (shapes != nullptr) {
