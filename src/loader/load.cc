@@ -174,6 +174,10 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.location_group_locations_ = old_location_group_locations;
       assert(old_location_group_locations.size() == old_location_group_locations_size
              && tt.location_group_locations_.size() == old_location_group_locations_size);
+      auto const old_location_group_name = tt.location_group_name_;
+      tt.location_group_name_ = old_location_group_name;
+      auto const old_location_group_id = tt.location_group_id_;
+      tt.location_group_id_ = old_location_group_id;
       auto const old_flex_area_bbox = tt.flex_area_bbox_;
       tt.flex_area_bbox_ = old_flex_area_bbox;
       auto const old_flex_area_id = tt.flex_area_id_;
@@ -191,6 +195,8 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.flex_area_desc_ = old_flex_area_desc;
       auto const old_flex_area_rtree = tt.flex_area_rtree_;
       tt.flex_area_rtree_ = old_flex_area_rtree;
+      auto const old_location_group_transports = tt.location_group_transports_;
+      tt.location_group_transports_ = old_location_group_transports;
       auto const old_flex_area_transports = tt.flex_area_transports_;
       tt.flex_area_transports_ = old_flex_area_transports;
       auto const old_flex_transport_trip = tt.flex_transport_trip_;
@@ -213,7 +219,10 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.locations_ = timetable::locations{};
       tt.location_routes_.clear();
       tt.location_areas_.clear();
+      tt.location_group_locations_.clear();
       tt.location_location_groups_.clear();
+      tt.location_group_name_.reset();
+      tt.location_group_id_.reset();
       tt.flex_area_bbox_.reset();
       tt.flex_area_id_.reset();
       tt.flex_area_src_.reset();
@@ -222,6 +231,7 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.flex_area_name_.clear();
       tt.flex_area_desc_.clear();
       tt.flex_area_rtree_ = rtree<flex_area_idx_t>{};
+      tt.location_group_transports_.clear();
       tt.flex_area_transports_.clear();
       tt.flex_transport_trip_.reset();
       tt.flex_transport_stop_time_windows_.clear();
@@ -284,13 +294,9 @@ timetable load(std::vector<timetable_source> const& sources,
       new_fares.push_back(tt.fares_[src]);
       auto new_location_areas = tt.location_areas_;
       auto new_location_location_groups = tt.location_location_groups_;
-      auto new_location_group_locations = paged_vecvec<location_group_idx_t, location_idx_t>{};
-      for (auto i = old_location_group_locations.size(); i < tt.location_group_locations_.size(); ++i) {
-        new_location_group_locations.emplace_back_empty();
-        for (auto j : tt.location_group_locations_[location_group_idx_t{i}]) {
-            new_location_group_locations.back().push_back(j);
-        }
-      }
+      auto new_location_group_locations = tt.location_group_locations_;
+      auto new_location_group_name = tt.location_group_name_;
+      auto new_location_group_id = tt.location_group_id_;
       auto new_flex_area_bbox = tt.flex_area_bbox_;
       auto new_flex_area_id = tt.flex_area_id_;
       auto new_flex_area_src = tt.flex_area_src_;
@@ -299,6 +305,7 @@ timetable load(std::vector<timetable_source> const& sources,
       auto new_flex_area_name = tt.flex_area_name_;
       auto new_flex_area_desc = tt.flex_area_desc_;
       auto new_flex_area_rtree = tt.flex_area_rtree_;
+      auto new_location_group_transports = tt.location_group_transports_;
       auto new_flex_area_transports = tt.flex_area_transports_;
       auto new_flex_transport_trip = tt.flex_transport_trip_;
       auto new_flex_transport_stop_time_windows = tt.flex_transport_stop_time_windows_;
@@ -328,6 +335,8 @@ timetable load(std::vector<timetable_source> const& sources,
       assert(old_location_group_locations.size() == old_location_group_locations_size
              && tt.location_group_locations_.size() == old_location_group_locations_size);
 
+      tt.location_group_name_ = old_location_group_name;
+      tt.location_group_id_ = old_location_group_id;
       tt.flex_area_bbox_ = old_flex_area_bbox;
       tt.flex_area_id_ = old_flex_area_id;
       tt.flex_area_src_ = old_flex_area_src;
@@ -336,6 +345,7 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.flex_area_name_ = old_flex_area_name;
       tt.flex_area_desc_ = old_flex_area_desc;
       tt.flex_area_rtree_ = old_flex_area_rtree;
+      tt.location_group_transports_ = old_location_group_transports;
       tt.flex_area_transports_ = old_flex_area_transports;
       tt.flex_transport_trip_ = old_flex_transport_trip;
       tt.flex_transport_stop_time_windows_ = old_flex_transport_stop_time_windows;
@@ -378,6 +388,7 @@ timetable load(std::vector<timetable_source> const& sources,
       }
       /*       location_idx_t	*/
       auto const locations_offset = location_idx_t{tt.n_locations()};
+      auto const location_group_offset = location_group_idx_t{tt.location_group_name_.size()};
       auto const alt_name_idx_offset = alt_name_idx_t{tt.locations_.alt_name_strings_.size()};
       auto const timezones_offset = timezone_idx_t{tt.locations_.timezones_.size()};
       {// merge locations struct
@@ -491,8 +502,11 @@ timetable load(std::vector<timetable_source> const& sources,
       for (auto i : new_location_areas) {
         tt.location_areas_.emplace_back(i);
       }
-      for (auto i : new_location_location_groups) {
-        tt.location_location_groups_.emplace_back(i);
+      for (location_idx_t i = location_idx_t{0}; i < location_idx_t{new_location_location_groups.size()}; ++i) {
+        tt.location_location_groups_.emplace_back_empty();
+        for (auto j : new_location_location_groups[i]) {
+          tt.location_location_groups_.back().push_back(j + location_group_offset);
+        }
       }
       for (location_group_idx_t i = location_group_idx_t{0}; i < location_group_idx_t{new_location_group_locations.size()}; ++i) {
         tt.location_group_locations_.emplace_back_empty();
@@ -562,6 +576,12 @@ timetable load(std::vector<timetable_source> const& sources,
           for (size_t i = 0; i < n.count_; ++i) {
             tt.flex_area_rtree_.insert(n.rects_[i].min_, n.rects_[i].max_, n.data_[i]);
           }
+        }
+      }
+      for (location_group_idx_t i = location_group_idx_t{0}; i < location_group_idx_t{new_location_group_transports.size()}; ++i) {
+        tt.location_group_transports_.emplace_back_empty();
+        for (auto j : new_location_group_transports[i]) {
+          tt.location_group_transports_.back().push_back(j);
         }
       }
       for (flex_area_idx_t i = flex_area_idx_t{0}; i < flex_area_idx_t{new_flex_area_transports.size()}; ++i) {
