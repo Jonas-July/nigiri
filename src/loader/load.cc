@@ -142,8 +142,6 @@ timetable load(std::vector<timetable_source> const& sources,
       auto const old_bitfields = tt.bitfields_;
       auto const old_transport_traffic_days_ = tt.transport_traffic_days_;
       tt.transport_traffic_days_ = old_transport_traffic_days_;
-      auto const old_flex_transport_traffic_days_ = tt.flex_transport_traffic_days_;
-      tt.flex_transport_traffic_days_ = old_flex_transport_traffic_days_;
       auto const old_source_end_date = tt.src_end_date_;
       tt.src_end_date_ = old_source_end_date;
       auto const old_source_file_names = tt.source_file_names_;
@@ -199,6 +197,8 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.location_group_transports_ = old_location_group_transports;
       auto const old_flex_area_transports = tt.flex_area_transports_;
       tt.flex_area_transports_ = old_flex_area_transports;
+      auto const old_flex_transport_traffic_days = tt.flex_transport_traffic_days_;
+      tt.flex_transport_traffic_days_ = old_flex_transport_traffic_days;
       auto const old_flex_transport_trip = tt.flex_transport_trip_;
       tt.flex_transport_trip_ = old_flex_transport_trip;
       auto const old_flex_transport_stop_time_windows = tt.flex_transport_stop_time_windows_;
@@ -237,6 +237,7 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.flex_area_rtree_ = rtree<flex_area_idx_t>{};
       tt.location_group_transports_.clear();
       tt.flex_area_transports_.clear();
+      tt.flex_transport_traffic_days_.reset();
       tt.flex_transport_trip_.reset();
       tt.flex_transport_stop_time_windows_.clear();
       tt.flex_transport_stop_seq_.reset();
@@ -274,10 +275,6 @@ timetable load(std::vector<timetable_source> const& sources,
       for (auto i = old_transport_traffic_days_.size(); i < tt.transport_traffic_days_.size(); ++i) {
         new_transport_traffic_days_.push_back(tt.transport_traffic_days_[transport_idx_t{i}]);
       }
-      auto new_flex_transport_traffic_days_ = vector_map<flex_transport_idx_t, bitfield_idx_t>{};
-      for (auto i = old_flex_transport_traffic_days_.size(); i < tt.flex_transport_traffic_days_.size(); ++i) {
-        new_flex_transport_traffic_days_.push_back(tt.flex_transport_traffic_days_[flex_transport_idx_t{i}]);
-      }
       auto const new_source_end_date = tt.src_end_date_;
       auto const new_source_file_names = tt.source_file_names_;
       auto const new_trip_debug = tt.trip_debug_;
@@ -313,6 +310,7 @@ timetable load(std::vector<timetable_source> const& sources,
       auto const new_flex_area_rtree = tt.flex_area_rtree_;
       auto const new_location_group_transports = tt.location_group_transports_;
       auto const new_flex_area_transports = tt.flex_area_transports_;
+      auto const new_flex_transport_traffic_days = tt.flex_transport_traffic_days_;
       auto const new_flex_transport_trip = tt.flex_transport_trip_;
       auto const new_flex_transport_stop_time_windows = tt.flex_transport_stop_time_windows_;
       auto const new_flex_transport_stop_seq = tt.flex_transport_stop_seq_;
@@ -324,7 +322,6 @@ timetable load(std::vector<timetable_source> const& sources,
       /* Restore old timetable */
       tt.bitfields_ = old_bitfields;
       tt.transport_traffic_days_ = old_transport_traffic_days_;
-      tt.flex_transport_traffic_days_ = old_flex_transport_traffic_days_;
       tt.src_end_date_ = old_source_end_date;
       tt.source_file_names_ = old_source_file_names;
       tt.trip_debug_ = old_trip_debug;
@@ -355,6 +352,7 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.flex_area_rtree_ = old_flex_area_rtree;
       tt.location_group_transports_ = old_location_group_transports;
       tt.flex_area_transports_ = old_flex_area_transports;
+      tt.flex_transport_traffic_days_ = old_flex_transport_traffic_days;
       tt.flex_transport_trip_ = old_flex_transport_trip;
       tt.flex_transport_stop_time_windows_ = old_flex_transport_stop_time_windows;
       tt.flex_transport_stop_seq_ = old_flex_transport_stop_seq;
@@ -372,9 +370,6 @@ timetable load(std::vector<timetable_source> const& sources,
       }
       for (auto const& i : new_transport_traffic_days_) {
         tt.transport_traffic_days_.push_back(corrected_indices[i]);
-      }
-      for (auto const& i : new_flex_transport_traffic_days_) {
-        tt.flex_transport_traffic_days_.push_back(corrected_indices[i]);
       }
       /*	 sources	*/
       for (auto const& i : new_source_end_date) {
@@ -620,17 +615,21 @@ timetable load(std::vector<timetable_source> const& sources,
           }
         }
       }
+      auto const flex_transport_traffic_days_offset = flex_transport_idx_t{tt.flex_transport_traffic_days_.size()};
       for (location_group_idx_t i = location_group_idx_t{0}; i < location_group_idx_t{new_location_group_transports.size()}; ++i) {
         tt.location_group_transports_.emplace_back_empty();
         for (auto const& j : new_location_group_transports[i]) {
-          tt.location_group_transports_.back().push_back(j);
+          tt.location_group_transports_.back().push_back(j != flex_transport_idx_t::invalid() ? j + flex_transport_traffic_days_offset : flex_transport_idx_t::invalid());
         }
       }
       for (flex_area_idx_t i = flex_area_idx_t{0}; i < flex_area_idx_t{new_flex_area_transports.size()}; ++i) {
         tt.flex_area_transports_.emplace_back_empty();
         for (auto const& j : new_flex_area_transports[i]) {
-          tt.flex_area_transports_.back().push_back(j);
+          tt.flex_area_transports_.back().push_back(j != flex_transport_idx_t::invalid() ? j + flex_transport_traffic_days_offset : flex_transport_idx_t::invalid());
         }
+      }
+      for (auto const& i : new_flex_transport_traffic_days) {
+        tt.flex_transport_traffic_days_.push_back(i != bitfield_idx_t::invalid() ? corrected_indices[i] : bitfield_idx_t::invalid());
       }
       for (auto const& i : new_flex_transport_trip) {
         tt.flex_transport_trip_.push_back(i);
