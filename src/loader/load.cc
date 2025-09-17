@@ -156,6 +156,8 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.trip_direction_id_ = old_trip_direction_id;
       auto const old_trip_route_id = tt.trip_route_id_;
       tt.trip_route_id_ = old_trip_route_id;
+      auto const old_route_ids = tt.route_ids_;
+      tt.route_ids_ = old_route_ids;
       auto const old_trip_transport_ranges = tt.trip_transport_ranges_;
       tt.trip_transport_ranges_ = old_trip_transport_ranges;
       auto const old_trip_stop_seq_numbers = tt.trip_stop_seq_numbers_;
@@ -267,6 +269,9 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.trip_id_src_.reset();
       tt.trip_direction_id_.resize(0U);
       tt.trip_route_id_.reset();
+      // length must correspond to src
+      tt.route_ids_.reset();
+      tt.route_ids_.resize(to_idx(src));
       tt.trip_transport_ranges_.clear();
       tt.trip_stop_seq_numbers_.clear();
       tt.trip_debug_ = mutable_fws_multimap<trip_idx_t, trip_debug>{};
@@ -346,6 +351,8 @@ timetable load(std::vector<timetable_source> const& sources,
       auto new_trip_id_src = tt.trip_id_src_;
       auto new_trip_direction_id = tt.trip_direction_id_;
       auto new_trip_route_id = tt.trip_route_id_;
+      auto new_route_ids = vector_map<source_idx_t, timetable::route_ids>{};
+      new_route_ids.emplace_back(tt.route_ids_[src]);
       auto new_trip_transport_ranges = tt.trip_transport_ranges_;
       auto new_trip_stop_seq_numbers = tt.trip_stop_seq_numbers_;
       auto new_source_file_names = tt.source_file_names_;
@@ -414,6 +421,7 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.trip_id_src_ = old_trip_id_src;
       tt.trip_direction_id_ = old_trip_direction_id;
       tt.trip_route_id_ = old_trip_route_id;
+      tt.route_ids_ = old_route_ids;
       tt.trip_transport_ranges_ = old_trip_transport_ranges;
       tt.trip_stop_seq_numbers_ = old_trip_stop_seq_numbers;
       tt.source_file_names_ = old_source_file_names;
@@ -820,6 +828,18 @@ timetable load(std::vector<timetable_source> const& sources,
         for (auto j : i) {
           vec.push_back(j + trip_offset);
         }
+      }
+      /*      route_id_idx_t	 */
+      for (auto i : new_route_ids) {
+        auto vec = paged_vecvec<route_id_idx_t, trip_idx_t>{};
+        for (auto j = route_id_idx_t{0U}; j < i.route_id_trips_.size(); ++j) {
+          vec.emplace_back_empty();
+          for (auto k : i.route_id_trips_[j]) {
+            vec.back().push_back(k + trip_offset);
+          }
+        }
+        i.route_id_trips_ = vec;
+        tt.route_ids_.push_back(i);
       }
       /* Save snapshot */
       fs::create_directories(local_cache_path);
