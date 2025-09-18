@@ -140,8 +140,6 @@ timetable load(std::vector<timetable_source> const& sources,
       }
       /* Save data to restore later */
       auto old_bitfields = tt.bitfields_;
-      auto const old_transport_traffic_days_ = tt.transport_traffic_days_;
-      tt.transport_traffic_days_ = old_transport_traffic_days_;
       auto const old_source_end_date = tt.src_end_date_;
       tt.src_end_date_ = old_source_end_date;
       auto const old_trip_id_to_idx = tt.trip_id_to_idx_;
@@ -192,8 +190,12 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.route_stop_times_ = old_route_stop_times;
       auto const old_transport_first_dep_offset = tt.transport_first_dep_offset_;
       tt.transport_first_dep_offset_ = old_transport_first_dep_offset;
+      auto const old_transport_traffic_days = tt.transport_traffic_days_;
+      tt.transport_traffic_days_ = old_transport_traffic_days;
       auto const old_transport_route = tt.transport_route_;
       tt.transport_route_ = old_transport_route;
+      auto const old_transport_to_trip_section = tt.transport_to_trip_section_;
+      tt.transport_to_trip_section_ = old_transport_to_trip_section;
       auto const old_languages = tt.languages_;
       tt.languages_ = old_languages;
       auto const old_locations = tt.locations_;
@@ -300,6 +302,9 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.route_stop_time_ranges_.reset();
       tt.route_stop_times_.clear();
       tt.transport_first_dep_offset_.reset();
+      tt.transport_traffic_days_.reset();
+      tt.transport_route_.reset();
+      tt.transport_to_trip_section_.clear();
       tt.transport_section_attributes_.clear();
       tt.transport_section_providers_.clear();
       tt.transport_section_directions_.clear();
@@ -359,10 +364,6 @@ timetable load(std::vector<timetable_source> const& sources,
       }
       /* Save new data */
       auto new_bitfields = tt.bitfields_;
-      auto new_transport_traffic_days_ = vector_map<transport_idx_t, bitfield_idx_t>{};
-      for (auto i = old_transport_traffic_days_.size(); i < tt.transport_traffic_days_.size(); ++i) {
-        new_transport_traffic_days_.push_back(tt.transport_traffic_days_[transport_idx_t{i}]);
-      }
       auto new_source_end_date = tt.src_end_date_;
       auto new_trip_id_to_idx = tt.trip_id_to_idx_;
       auto new_trip_ids = tt.trip_ids_;
@@ -389,10 +390,9 @@ timetable load(std::vector<timetable_source> const& sources,
       auto new_route_stop_time_ranges = tt.route_stop_time_ranges_;
       auto new_route_stop_times = tt.route_stop_times_;
       auto new_transport_first_dep_offset = tt.transport_first_dep_offset_;
-      auto new_transport_route = vector_map<transport_idx_t, route_idx_t>{};
-      for (auto i = old_transport_route.size(); i < tt.transport_route_.size(); ++i) {
-        new_transport_route.push_back(tt.transport_route_[transport_idx_t{i}]);
-      }
+      auto new_transport_traffic_days = tt.transport_traffic_days_;
+      auto new_transport_route = tt.transport_route_;
+      auto new_transport_to_trip_section = tt.transport_to_trip_section_;
       auto new_languages = tt.languages_;
       auto new_locations = tt.locations_;
       auto new_merged_trips = vecvec<merged_trips_idx_t, trip_idx_t>{};
@@ -438,7 +438,6 @@ timetable load(std::vector<timetable_source> const& sources,
       progress_tracker->status("Saved new data");
       /* Restore old timetable */
       tt.bitfields_ = old_bitfields;
-      tt.transport_traffic_days_ = old_transport_traffic_days_;
       tt.src_end_date_ = old_source_end_date;
       tt.trip_id_to_idx_ = old_trip_id_to_idx;
       tt.trip_ids_ = old_trip_ids;
@@ -464,7 +463,9 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.route_stop_time_ranges_ = old_route_stop_time_ranges;
       tt.route_stop_times_ = old_route_stop_times;
       tt.transport_first_dep_offset_ = old_transport_first_dep_offset;
+      tt.transport_traffic_days_ = old_transport_traffic_days;
       tt.transport_route_ = old_transport_route;
+      tt.transport_to_trip_section_ = old_transport_to_trip_section;
       tt.merged_trips_ = old_merged_trips;
       tt.transport_section_attributes_ = old_transport_section_attributes;
       tt.transport_section_providers_ = old_transport_section_providers;
@@ -512,9 +513,6 @@ timetable load(std::vector<timetable_source> const& sources,
         auto adjusted_idx = utl::get_or_create(
             bitfields_, bf, [&]() { return tt.register_bitfield(bf); });
         corrected_indices.emplace_back(adjusted_idx);
-      }
-      for (auto i : new_transport_traffic_days_) {
-        tt.transport_traffic_days_.push_back(corrected_indices[bitfield_idx_t{i}]);
       }
       /*	 sources	*/
       for (auto i : new_source_end_date) {
@@ -680,8 +678,9 @@ timetable load(std::vector<timetable_source> const& sources,
         assert(i.size() == 0);
       }
       /*        route_idx_t	*/
+      auto const transport_idx_offset = transport_idx_t{tt.transport_traffic_days_.size()};
       for (auto i : new_route_transport_ranges) {
-        tt.route_transport_ranges_.push_back(i);
+        tt.route_transport_ranges_.push_back(interval{i.from_ + transport_idx_offset, i.to_ + transport_idx_offset});
       }
       for (auto i : new_route_location_seq) {
         auto vec = tt.route_location_seq_.add_back_sized(0U);
@@ -878,6 +877,12 @@ timetable load(std::vector<timetable_source> const& sources,
       }
       //tt.initial_day_offset_ not used during loading
       assert(tt.initial_day_offset_.size() == 0);
+      for (auto i : new_transport_traffic_days) {
+        tt.transport_traffic_days_.push_back(corrected_indices[bitfield_idx_t{i}]);
+      }
+      for (auto i : new_transport_to_trip_section) {
+        tt.transport_to_trip_section_.emplace_back(i);
+      }
       for (auto i : new_transport_section_attributes) {
         tt.transport_section_attributes_.emplace_back(i);
       }
