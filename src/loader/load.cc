@@ -218,6 +218,8 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.location_routes_ = old_location_routes;
       auto const old_providers = tt.providers_;
       tt.providers_ = old_providers;
+      auto const old_provider_id_to_idx = tt.provider_id_to_idx_;
+      tt.provider_id_to_idx_ = old_provider_id_to_idx;
       auto const old_fares = tt.fares_;
       tt.fares_ = old_fares;
       auto const old_areas = tt.areas_;
@@ -318,6 +320,8 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.languages_.clear();
       tt.locations_ = timetable::locations{};
       tt.location_routes_.clear();
+      tt.providers_.reset();
+      tt.provider_id_to_idx_.reset();
       tt.areas_.reset();
       tt.location_areas_.clear();
       tt.location_group_locations_.clear();
@@ -412,10 +416,8 @@ timetable load(std::vector<timetable_source> const& sources,
       auto new_transport_section_lines = tt.transport_section_lines_;
       auto new_transport_section_route_colors = tt.transport_section_route_colors_;
       auto new_location_routes = tt.location_routes_;
-      auto new_providers = vector_map<provider_idx_t, provider>{};
-      for (auto i = old_providers.size(); i < tt.providers_.size(); ++i) {
-        new_providers.push_back(tt.providers_[provider_idx_t{i}]);
-      }
+      auto new_providers = tt.providers_;
+      auto new_provider_id_to_idx = tt.provider_id_to_idx_;
       // last fares are new
       auto new_fares = vector_map<source_idx_t, fares>{};
       new_fares.push_back(tt.fares_[src]);
@@ -485,6 +487,7 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.locations_ = old_locations;
       tt.location_routes_ = old_location_routes;
       tt.providers_ = old_providers;
+      tt.provider_id_to_idx_ = old_provider_id_to_idx;
       tt.fares_ = old_fares;
       tt.areas_ = old_areas;
       tt.location_areas_ = old_location_areas;
@@ -761,9 +764,13 @@ timetable load(std::vector<timetable_source> const& sources,
         tt.fares_.push_back(i);
       }
       /*      provider_idx_t	*/
+      auto const provider_idx_offset = provider_idx_t{tt.providers_.size()};
       for (auto i : new_providers) {
         i.tz_ = i.tz_ + timezones_offset;
         tt.providers_.push_back(i);
+      }
+      for (auto i : new_provider_id_to_idx) {
+        tt.provider_id_to_idx_.push_back(i + provider_idx_offset);
       }
       /*	  Flex		*/
       for (auto i : new_flex_area_bbox) {
@@ -897,7 +904,12 @@ timetable load(std::vector<timetable_source> const& sources,
             vec.back().push_back(k + trip_offset);
           }
         }
+        auto providers = vector_map<route_id_idx_t, provider_idx_t>{};
+        for (auto j : i.route_id_provider_) {
+          providers.push_back(j + provider_idx_offset);
+        }
         i.route_id_trips_ = vec;
+        i.route_id_provider_ = providers;
         tt.route_ids_.push_back(i);
       }
       /*     transport_idx_t	*/
@@ -916,7 +928,10 @@ timetable load(std::vector<timetable_source> const& sources,
         tt.transport_section_attributes_.emplace_back(i);
       }
       for (auto i : new_transport_section_providers) {
-        tt.transport_section_providers_.emplace_back(i);
+        auto vec = tt.transport_section_providers_.add_back_sized(0U);
+        for (auto j : i) {
+          vec.push_back(j + provider_idx_offset);
+        }
       }
       for (auto i : new_transport_section_directions) {
         tt.transport_section_directions_.emplace_back(i);
