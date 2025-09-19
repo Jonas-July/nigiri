@@ -337,6 +337,7 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.transport_traffic_days_.reset();
       tt.transport_route_.reset();
       tt.transport_to_trip_section_.clear();
+      tt.merged_trips_.clear();
       tt.attributes_.reset();
       tt.attribute_combinations_.clear();
       tt.trip_direction_strings_.clear();
@@ -440,10 +441,7 @@ timetable load(std::vector<timetable_source> const& sources,
       auto new_transport_to_trip_section = tt.transport_to_trip_section_;
       auto new_languages = tt.languages_;
       auto new_locations = tt.locations_;
-      auto new_merged_trips = vecvec<merged_trips_idx_t, trip_idx_t>{};
-      for (auto i = old_merged_trips.size(); i < tt.merged_trips_.size(); ++i) {
-        new_merged_trips.emplace_back(tt.merged_trips_[merged_trips_idx_t{i}]);
-      }
+      auto new_merged_trips = tt.merged_trips_;
       auto new_attributes = tt.attributes_;
       auto new_attribute_combinations = tt.attribute_combinations_;
       auto new_trip_direction_strings = tt.trip_direction_strings_;
@@ -964,8 +962,12 @@ timetable load(std::vector<timetable_source> const& sources,
       for (auto i : new_transport_traffic_days) {
         tt.transport_traffic_days_.push_back(corrected_indices[bitfield_idx_t{i}]);
       }
+      auto const merged_trips_idx_offset = merged_trips_idx_t{tt.merged_trips_.size()};
       for (auto i : new_transport_to_trip_section) {
-        tt.transport_to_trip_section_.emplace_back(i);
+        auto vec = tt.transport_to_trip_section_.add_back_sized(0U);
+        for (auto j : i) {
+          vec.push_back(j + merged_trips_idx_offset);
+        }
       }
       for (auto i : new_transport_section_attributes) {
         tt.transport_section_attributes_.emplace_back(i);
