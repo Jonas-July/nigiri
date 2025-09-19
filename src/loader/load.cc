@@ -303,6 +303,8 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.flex_transport_drop_off_booking_rule_ = old_flex_transport_drop_off_booking_rule;
       auto const old_booking_rules = tt.booking_rules_;
       tt.booking_rules_ = old_booking_rules;
+      auto const old_strings = tt.strings_;
+      tt.strings_ = old_strings;
       /* Prepare timetable by emptying corrected fields */
       tt.bitfields_.reset();
       auto bitfields = hash_map<bitfield, bitfield_idx_t>{};
@@ -380,6 +382,7 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.flex_transport_pickup_booking_rule_.clear();
       tt.flex_transport_drop_off_booking_rule_.clear();
       tt.booking_rules_.reset();
+      tt.strings_ = string_store<string_idx_t>{};
       // Fields not used during loading
       assert(tt.locations_.footpaths_out_.size() == kNProfiles);
       for (auto i : tt.locations_.footpaths_out_) {
@@ -482,6 +485,7 @@ timetable load(std::vector<timetable_source> const& sources,
       auto new_flex_transport_pickup_booking_rule = tt.flex_transport_pickup_booking_rule_;
       auto new_flex_transport_drop_off_booking_rule = tt.flex_transport_drop_off_booking_rule_;
       auto new_booking_rules = tt.booking_rules_;
+      auto new_strings = tt.strings_;
       progress_tracker->status("Saved new data");
       /* Restore old timetable */
       tt.bitfields_ = old_bitfields;
@@ -560,6 +564,7 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.flex_transport_pickup_booking_rule_ = old_flex_transport_pickup_booking_rule;
       tt.flex_transport_drop_off_booking_rule_ = old_flex_transport_drop_off_booking_rule;
       tt.booking_rules_ = old_booking_rules;
+      tt.strings_ = old_strings;
       /* Add new data and adjust references */
       /*	bitfields	*/
       auto corrected_indices = vector_map<bitfield_idx_t, bitfield_idx_t>{};
@@ -567,6 +572,12 @@ timetable load(std::vector<timetable_source> const& sources,
         auto adjusted_idx = utl::get_or_create(
             bitfields_, bf, [&]() { return tt.register_bitfield(bf); });
         corrected_indices.emplace_back(adjusted_idx);
+      }
+      /*       string_idx_t	*/
+      auto string_map = vector_map<string_idx_t, string_idx_t>{};
+      for (auto const& [idx_, s] : utl::enumerate(new_strings.strings_)) {
+        auto new_idx = tt.strings_.store(s.view());
+        string_map.push_back(new_idx);
       }
       /*	 sources	*/
       for (auto i : new_source_end_date) {
@@ -780,6 +791,28 @@ timetable load(std::vector<timetable_source> const& sources,
       }
       /*          fares		*/
       for (auto i : new_fares) {
+        auto new_leg_group_name = vector_map<leg_group_idx_t, string_idx_t>{};
+        for (auto j : i.leg_group_name_) {
+          new_leg_group_name.push_back(string_map[j]);
+        }
+        auto new_fare_media = vector_map<fare_media_idx_t, fares::fare_media>{};
+        for (auto j : i.fare_media_) {
+          j.name_ = string_map[j.name_];
+          new_fare_media.push_back(j);
+        }
+        auto new_fare_products = vecvec<fare_product_idx_t, fares::fare_product>{};
+        for (auto j : i.fare_products_) {
+          auto vec = new_fare_products.add_back_sized(0U);
+          for (auto k : j) {
+            k.name_ = string_map[k.name_];
+            k.currency_code_ = string_map[k.currency_code_];
+            vec.push_back(k);
+          }
+        }
+        auto new_fare_product_id = vector_map<fare_product_idx_t, string_idx_t>{};
+        for (auto j : i.fare_product_id_) {
+          new_fare_product_id.push_back(string_map[j]);
+        }
         auto new_fare_leg_rules = vector<fares::fare_leg_rule>{};
         for (auto j : i.fare_leg_rules_) {
           j.from_area_ = j.from_area_ + area_idx_offset;
@@ -792,6 +825,30 @@ timetable load(std::vector<timetable_source> const& sources,
           j.to_stop_ = j.to_stop_ + locations_offset;
           new_fare_leg_join_rules.push_back(j);
         }
+        auto new_rider_categories = vector_map<rider_category_idx_t, fares::rider_category>{};
+        for (auto j : i.rider_categories_) {
+          j.name_ = string_map[j.name_];
+          j.eligibility_url_ = string_map[j.eligibility_url_];
+          new_rider_categories.push_back(j);
+        }
+        auto new_timeframes = vecvec<timeframe_group_idx_t, fares::timeframe>{};
+        for (auto j : i.timeframes_) {
+          auto vec = new_timeframes.add_back_sized(0U);
+          for (auto k : j) {
+            k.service_id_ = string_map[k.service_id_];
+            vec.push_back(k);
+          }
+        }
+        auto new_timeframe_id = vector_map<timeframe_group_idx_t, string_idx_t>{};
+        for (auto j : i.timeframe_id_) {
+          new_timeframe_id.push_back(string_map[j]);
+        }
+        auto new_networks = vector_map<network_idx_t, fares::network>{};
+        for (auto j : i.networks_) {
+          j.id_ = string_map[j.id_];
+          j.name_ = string_map[j.name_];
+          new_networks.push_back(j);
+        }
         auto new_area_sets = vecvec<area_set_idx_t, area_idx_t>{};
         for (auto j : i.area_sets_) {
           auto vec = new_area_sets.add_back_sized(0U);
@@ -799,14 +856,30 @@ timetable load(std::vector<timetable_source> const& sources,
              vec.push_back(k + area_idx_offset);
           }
         }
+        auto new_area_set_ids = vector_map<area_set_idx_t, string_idx_t>{};
+        for (auto j : i.area_set_ids_) {
+          new_area_set_ids.push_back(string_map[j]);
+        }
+        i.leg_group_name_ = new_leg_group_name;
+        i.fare_media_ = new_fare_media;
+        i.fare_products_ = new_fare_products;
+        i.fare_product_id_ = new_fare_product_id;
         i.fare_leg_rules_ = new_fare_leg_rules;
         i.fare_leg_join_rules_ = new_fare_leg_join_rules;
+        i.rider_categories_ = new_rider_categories;
+        i.timeframes_ = new_timeframes;
+        i.timeframe_id_ = new_timeframe_id;
+        i.networks_ = new_networks;
         i.area_sets_ = new_area_sets;
+        i.area_set_ids_ = new_area_set_ids;
         tt.fares_.push_back(i);
       }
       /*      provider_idx_t	*/
       auto const provider_idx_offset = provider_idx_t{tt.providers_.size()};
       for (auto i : new_providers) {
+        i.id_ = string_map[i.id_];
+        i.name_ = string_map[i.name_];
+        i.url_ = string_map[i.url_];
         i.tz_ = i.tz_ + timezones_offset;
         tt.providers_.push_back(i);
       }
@@ -818,7 +891,7 @@ timetable load(std::vector<timetable_source> const& sources,
         tt.flex_area_bbox_.push_back(i);
       }
       for (auto i : new_flex_area_id) {
-        tt.flex_area_id_.push_back(i);
+        tt.flex_area_id_.push_back(string_map[i]);
       }
       for (auto i : new_flex_area_src) {
         tt.flex_area_src_.push_back(i);
@@ -887,6 +960,13 @@ timetable load(std::vector<timetable_source> const& sources,
         }
       }
       for (auto i : new_booking_rules) {
+        i.id_ = string_map[i.id_];
+        i.message_ = string_map[i.message_];
+        i.pickup_message_ = string_map[i.pickup_message_];
+        i.drop_off_message_ = string_map[i.drop_off_message_];
+        i.phone_number_ = string_map[i.phone_number_];
+        i.info_url_ = string_map[i.info_url_];
+        i.booking_url_ = string_map[i.booking_url_];
         tt.booking_rules_.push_back(i);
       }
       /*      trip_id_idx_t	*/
@@ -997,7 +1077,7 @@ timetable load(std::vector<timetable_source> const& sources,
       }
       /*        area_idx_t	*/
       for (auto i : new_areas) {
-        tt.areas_.push_back(i);
+        tt.areas_.push_back(area{string_map[i.id_], string_map[i.name_]});
       }
       /*      attribute_idx_t	*/
       auto const attribute_idx_offset = attribute_idx_t{tt.attributes_.size()};
