@@ -202,6 +202,10 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.locations_ = old_locations;
       auto const old_merged_trips = tt.merged_trips_;
       tt.merged_trips_ = old_merged_trips;
+      auto const old_attributes = tt.attributes_;
+      tt.attributes_ = old_attributes;
+      auto const old_attribute_combinations = tt.attribute_combinations_;
+      tt.attribute_combinations_ = old_attribute_combinations;
       auto const old_trip_lines = tt.trip_lines_;
       tt.trip_lines_ = old_trip_lines;
       auto const old_transport_section_attributes = tt.transport_section_attributes_;
@@ -311,6 +315,8 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.transport_traffic_days_.reset();
       tt.transport_route_.reset();
       tt.transport_to_trip_section_.clear();
+      tt.attributes_.reset();
+      tt.attribute_combinations_.clear();
       tt.trip_lines_.clear();
       tt.transport_section_attributes_.clear();
       tt.transport_section_providers_.clear();
@@ -409,6 +415,8 @@ timetable load(std::vector<timetable_source> const& sources,
       for (auto i = old_merged_trips.size(); i < tt.merged_trips_.size(); ++i) {
         new_merged_trips.emplace_back(tt.merged_trips_[merged_trips_idx_t{i}]);
       }
+      auto new_attributes = tt.attributes_;
+      auto new_attribute_combinations = tt.attribute_combinations_;
       auto new_trip_lines = tt.trip_lines_;
       auto new_transport_section_attributes = tt.transport_section_attributes_;
       auto new_transport_section_providers = tt.transport_section_providers_;
@@ -477,6 +485,8 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.transport_route_ = old_transport_route;
       tt.transport_to_trip_section_ = old_transport_to_trip_section;
       tt.merged_trips_ = old_merged_trips;
+      tt.attributes_ = old_attributes;
+      tt.attribute_combinations_ = old_attribute_combinations;
       tt.trip_lines_ = old_trip_lines;
       tt.transport_section_attributes_ = old_transport_section_attributes;
       tt.transport_section_providers_ = old_transport_section_providers;
@@ -953,6 +963,17 @@ timetable load(std::vector<timetable_source> const& sources,
       /*        area_idx_t	*/
       for (auto i : new_areas) {
         tt.areas_.push_back(i);
+      }
+      /*      attribute_idx_t	*/
+      auto const attribute_idx_offset = attribute_idx_t{tt.attributes_.size()};
+      for (auto i : new_attributes) {
+        tt.attributes_.push_back(i);
+      }
+      for (auto i : new_attribute_combinations) {
+        auto vec = tt.attribute_combinations_.add_back_sized(0U);
+        for (auto j : i) {
+          vec.push_back(j + attribute_idx_offset);
+        }
       }
       /* Save snapshot */
       fs::create_directories(local_cache_path);
