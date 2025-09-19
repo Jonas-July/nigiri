@@ -43,6 +43,24 @@ struct change_detector {
   vector_map<source_idx_t, last_write_time_t> last_write_times;
 };
 
+struct index_mapping {
+  location_idx_t const location_idx_offset_;
+  trip_direction_string_idx_t const trip_direction_string_idx_offset_;
+
+  index_mapping(timetable const& first_tt)
+    : location_idx_offset_{first_tt.n_locations()},
+      trip_direction_string_idx_offset_{first_tt.trip_direction_strings_.size()} {}
+
+  auto map(location_idx_t const& i) const { return i != location_idx_t::invalid() ? i + location_idx_offset_ : location_idx_t::invalid(); }
+  auto map(trip_direction_string_idx_t const& i) const { return i != trip_direction_string_idx_t::invalid() ? i + trip_direction_string_idx_offset_ : trip_direction_string_idx_t::invalid(); }
+  auto map(trip_direction_t const& i) const { return i.apply([&](auto const& d) -> trip_direction_t { return trip_direction_t{map(d)}; });}
+
+  template<typename T>
+  auto map(T const& i) const {
+    return i;
+  }
+};
+
 timetable load(std::vector<timetable_source> const& sources,
                finalize_options const& finalize_opt,
                interval<date::sys_days> const& date_range,
@@ -208,6 +226,10 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.attributes_ = old_attributes;
       auto const old_attribute_combinations = tt.attribute_combinations_;
       tt.attribute_combinations_ = old_attribute_combinations;
+      auto const old_trip_direction_strings = tt.trip_direction_strings_;
+      tt.trip_direction_strings_ = old_trip_direction_strings;
+      auto const old_trip_directions = tt.trip_directions_;
+      tt.trip_directions_ = old_trip_directions;
       auto const old_trip_lines = tt.trip_lines_;
       tt.trip_lines_ = old_trip_lines;
       auto const old_transport_section_attributes = tt.transport_section_attributes_;
@@ -319,6 +341,8 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.transport_to_trip_section_.clear();
       tt.attributes_.reset();
       tt.attribute_combinations_.clear();
+      tt.trip_direction_strings_.clear();
+      tt.trip_directions_.reset();
       tt.trip_lines_.clear();
       tt.transport_section_attributes_.clear();
       tt.transport_section_providers_.clear();
@@ -419,6 +443,8 @@ timetable load(std::vector<timetable_source> const& sources,
       }
       auto const new_attributes = tt.attributes_;
       auto const new_attribute_combinations = tt.attribute_combinations_;
+      auto const new_trip_direction_strings = tt.trip_direction_strings_;
+      auto const new_trip_directions = tt.trip_directions_;
       auto const new_trip_lines = tt.trip_lines_;
       auto const new_transport_section_attributes = tt.transport_section_attributes_;
       auto const new_transport_section_providers = tt.transport_section_providers_;
@@ -489,6 +515,8 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.merged_trips_ = old_merged_trips;
       tt.attributes_ = old_attributes;
       tt.attribute_combinations_ = old_attribute_combinations;
+      tt.trip_direction_strings_ = old_trip_direction_strings;
+      tt.trip_directions_ = old_trip_directions;
       tt.trip_lines_ = old_trip_lines;
       tt.transport_section_attributes_ = old_transport_section_attributes;
       tt.transport_section_providers_ = old_transport_section_providers;
@@ -1030,6 +1058,14 @@ timetable load(std::vector<timetable_source> const& sources,
         for (auto const& j : i) {
           vec.push_back(j != attribute_idx_t::invalid() ? j + attribute_idx_offset : attribute_idx_t::invalid());
         }
+      }
+      /*  trip_direction_string_idx_t	*/
+      for (auto const& i : new_trip_direction_strings) {
+        tt.trip_direction_strings_.emplace_back(i);
+      }
+      auto const im = index_mapping(tt);
+      for (auto const& i : new_trip_directions) {
+        tt.trip_directions_.push_back(im.map(i));
       }
       /* Save snapshot */
       fs::create_directories(local_cache_path);
