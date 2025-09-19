@@ -220,6 +220,8 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.providers_ = old_providers;
       auto const old_fares = tt.fares_;
       tt.fares_ = old_fares;
+      auto const old_areas = tt.areas_;
+      tt.areas_ = old_areas;
       auto const old_location_areas = tt.location_areas_;
       tt.location_areas_ = old_location_areas;
       auto const old_location_location_groups_size = tt.location_location_groups_.size();
@@ -316,6 +318,7 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.languages_.clear();
       tt.locations_ = timetable::locations{};
       tt.location_routes_.clear();
+      tt.areas_.reset();
       tt.location_areas_.clear();
       tt.location_group_locations_.clear();
       tt.location_location_groups_.clear();
@@ -416,6 +419,7 @@ timetable load(std::vector<timetable_source> const& sources,
       // last fares are new
       auto new_fares = vector_map<source_idx_t, fares>{};
       new_fares.push_back(tt.fares_[src]);
+      auto new_areas = tt.areas_;
       auto new_location_areas = tt.location_areas_;
       auto new_location_location_groups = tt.location_location_groups_;
       auto new_location_group_locations = tt.location_group_locations_;
@@ -482,6 +486,7 @@ timetable load(std::vector<timetable_source> const& sources,
       tt.location_routes_ = old_location_routes;
       tt.providers_ = old_providers;
       tt.fares_ = old_fares;
+      tt.areas_ = old_areas;
       tt.location_areas_ = old_location_areas;
       tt.location_location_groups_ = old_location_location_groups;
       tt.location_group_locations_ = old_location_group_locations;
@@ -657,8 +662,12 @@ timetable load(std::vector<timetable_source> const& sources,
           vec.push_back(j + route_idx_offset);
         }
       }
+      auto const area_idx_offset = area_idx_t{tt.areas_.size()};
       for (auto i : new_location_areas) {
-        tt.location_areas_.emplace_back(i);
+        auto vec = tt.location_areas_.add_back_sized(0U);
+        for (auto j : i) {
+          vec.push_back(j + area_idx_offset);
+        }
       }
       for (location_idx_t i = location_idx_t{0}; i < location_idx_t{new_location_location_groups.size()}; ++i) {
         tt.location_location_groups_.emplace_back_empty();
@@ -727,13 +736,28 @@ timetable load(std::vector<timetable_source> const& sources,
       }
       /*          fares		*/
       for (auto i : new_fares) {
+        auto new_fare_leg_rules = vector<fares::fare_leg_rule>{};
+        for (auto j : i.fare_leg_rules_) {
+          j.from_area_ = j.from_area_ + area_idx_offset;
+          j.to_area_ = j.to_area_ + area_idx_offset;
+          new_fare_leg_rules.push_back(j);
+        }
         auto new_fare_leg_join_rules = vector<fares::fare_leg_join_rule>{};
         for (auto j : i.fare_leg_join_rules_) {
           j.from_stop_ = j.from_stop_ + locations_offset;
           j.to_stop_ = j.to_stop_ + locations_offset;
           new_fare_leg_join_rules.push_back(j);
         }
+        auto new_area_sets = vecvec<area_set_idx_t, area_idx_t>{};
+        for (auto j : i.area_sets_) {
+          auto vec = new_area_sets.add_back_sized(0U);
+          for (auto k : j) {
+             vec.push_back(k + area_idx_offset);
+          }
+        }
+        i.fare_leg_rules_ = new_fare_leg_rules;
         i.fare_leg_join_rules_ = new_fare_leg_join_rules;
+        i.area_sets_ = new_area_sets;
         tt.fares_.push_back(i);
       }
       /*      provider_idx_t	*/
@@ -910,6 +934,10 @@ timetable load(std::vector<timetable_source> const& sources,
       /*        Meta infos	*/
       for (auto i : new_trip_lines) {
         tt.trip_lines_.emplace_back(i);
+      }
+      /*        area_idx_t	*/
+      for (auto i : new_areas) {
+        tt.areas_.push_back(i);
       }
       /* Save snapshot */
       fs::create_directories(local_cache_path);
