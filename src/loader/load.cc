@@ -70,6 +70,7 @@ struct change_detector {
 struct index_mapping {
   alt_name_idx_t alt_name_idx_offset;
   area_idx_t area_idx_offset;
+  flex_stop_seq_idx_t flex_stop_seq_idx_offset;
   flex_transport_idx_t flex_transport_idx_offset;
   language_idx_t language_idx_offset;
   location_group_idx_t location_group_idx_offset;
@@ -86,6 +87,7 @@ struct index_mapping {
   index_mapping(timetable first_tt, source_idx_t src)
     : alt_name_idx_offset{first_tt.locations_.alt_name_strings_.size()},
       area_idx_offset{first_tt.areas_.size()},
+      flex_stop_seq_idx_offset{first_tt.flex_stop_seq_.size()},
       flex_transport_idx_offset{first_tt.flex_transport_traffic_days_.size()},
       language_idx_offset{first_tt.languages_.size()},
       location_group_idx_offset{first_tt.location_group_name_.size()},
@@ -101,6 +103,7 @@ struct index_mapping {
 
   auto map(alt_name_idx_t i) { return i + alt_name_idx_offset; }
   auto map(area_idx_t i) { return i + area_idx_offset; }
+  auto map(flex_stop_seq_idx_t i) { return i + flex_stop_seq_idx_offset; }
   auto map(flex_transport_idx_t i) { return i + flex_transport_idx_offset; }
   auto map(language_idx_t i) { return i + language_idx_offset; }
   auto map(location_group_idx_t i) { return i + location_group_idx_offset; }
@@ -695,9 +698,8 @@ timetable load(std::vector<timetable_source> const& sources,
       for (auto i : new_flex_transport_stop_time_windows) {
         tt.flex_transport_stop_time_windows_.emplace_back(i);
       }
-      auto flex_stop_seq_offset = flex_stop_seq_idx_t{tt.flex_stop_seq_.size()};
       for (auto i : new_flex_transport_stop_seq) {
-        tt.flex_transport_stop_seq_.push_back(i + flex_stop_seq_offset);
+        tt.flex_transport_stop_seq_.push_back(im.map(i));
       }
       for (auto i : new_flex_stop_seq) {
         tt.flex_stop_seq_.emplace_back(i);
