@@ -33,6 +33,32 @@ std::vector<std::unique_ptr<loader_interface>> get_loaders() {
   return loaders;
 }
 
+std::pair<timetable, std::unique_ptr<shapes_storage>> load_from_source(uint64_t const idx,
+                           dir* const dir,
+                           assistance_times* a,
+                           auto const it,
+                           std::vector<timetable_source> const& sources,
+                           interval<date::sys_days> const& date_range,
+                           fs::path const cache_path,
+                           shapes_storage const *  shapes) {
+  // create local state
+  auto const& [tag, path, local_config] = sources[idx];
+  auto const load_local_cache_path = cache_path / fmt::format("tt{:d}", idx + sources.size());
+  auto bitfields = hash_map<bitfield, bitfield_idx_t>{};
+  auto shape_store = shapes != nullptr ? std::make_unique<shapes_storage>(load_local_cache_path, shapes->mode_) : nullptr;
+  auto tt = timetable{};
+  tt.date_range_ = date_range;
+  tt.n_sources_ = static_cast<cista::base_t<source_idx_t>>(sources.size());
+  /* Load file */
+  try {
+    (*it)->load(local_config, source_idx_t{0}, *dir, tt, bitfields, a, shape_store.get());
+  } catch (std::exception const& e) {
+    throw utl::fail("failed to load {}: {}", path, e.what());
+  }
+  tt.write(load_local_cache_path / "tt.bin");
+  return std::make_pair(tt, std::move(shape_store));
+}
+
 using last_write_time_t = cista::strong<std::int64_t, struct _last_write_time>;
 using source_path_t = cista::basic_string<char const*>;
 
@@ -328,20 +354,9 @@ timetable load(std::vector<timetable_source> const& sources,
       assert(tt.initial_day_offset_.size() == 0);
       assert(tt.profiles_.size() == 0);
       assert(tt.date_range_ == date_range);
-      // create local state
-      auto const load_local_cache_path = cache_path / fmt::format("tt{:d}", idx + sources.size());
-      auto bitfields = hash_map<bitfield, bitfield_idx_t>{};
-      auto shape_store = shapes != nullptr ? std::make_unique<shapes_storage>(load_local_cache_path, shapes->mode_) : nullptr;
-      tt = timetable{};
-      tt.date_range_ = date_range;
-      tt.n_sources_ = static_cast<cista::base_t<source_idx_t>>(sources.size());
-      /* Load file */
-      try {
-        (*it)->load(local_config, source_idx_t{0}, *dir, tt, bitfields, a, shape_store.get());
-      } catch (std::exception const& e) {
-        throw utl::fail("failed to load {}: {}", path, e.what());
-      }
-      tt.write(load_local_cache_path / "tt.bin");
+      auto result = load_from_source(idx, dir.get(), a, it, sources, date_range, cache_path, shapes);
+      tt = result.first;
+      auto shape_store = std::move(result.second);
       /* Save new data */
       auto new_bitfields = tt.bitfields_;
       auto new_source_end_date = tt.src_end_date_;
