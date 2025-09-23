@@ -70,6 +70,7 @@ struct change_detector {
 struct index_mapping {
   alt_name_idx_t alt_name_idx_offset;
   area_idx_t area_idx_offset;
+  flex_transport_idx_t flex_transport_idx_offset;
   language_idx_t language_idx_offset;
   location_group_idx_t location_group_idx_offset;
   location_idx_t location_idx_offset;
@@ -85,6 +86,7 @@ struct index_mapping {
   index_mapping(timetable first_tt, source_idx_t src)
     : alt_name_idx_offset{first_tt.locations_.alt_name_strings_.size()},
       area_idx_offset{first_tt.areas_.size()},
+      flex_transport_idx_offset{first_tt.flex_transport_traffic_days_.size()},
       language_idx_offset{first_tt.languages_.size()},
       location_group_idx_offset{first_tt.location_group_name_.size()},
       location_idx_offset{first_tt.n_locations()},
@@ -99,6 +101,7 @@ struct index_mapping {
 
   auto map(alt_name_idx_t i) { return i + alt_name_idx_offset; }
   auto map(area_idx_t i) { return i + area_idx_offset; }
+  auto map(flex_transport_idx_t i) { return i + flex_transport_idx_offset; }
   auto map(language_idx_t i) { return i + language_idx_offset; }
   auto map(location_group_idx_t i) { return i + location_group_idx_offset; }
   auto map(location_idx_t i) { return i + location_idx_offset; }
@@ -671,17 +674,16 @@ timetable load(std::vector<timetable_source> const& sources,
           }
         }
       }
-      auto flex_transport_traffic_days_offset = flex_transport_idx_t{tt.flex_transport_traffic_days_.size()};
       for (location_group_idx_t i = location_group_idx_t{0}; i < location_group_idx_t{new_location_group_transports.size()}; ++i) {
         tt.location_group_transports_.emplace_back_empty();
         for (auto j : new_location_group_transports[i]) {
-          tt.location_group_transports_.back().push_back(j + flex_transport_traffic_days_offset);
+          tt.location_group_transports_.back().push_back(im.map(j));
         }
       }
       for (flex_area_idx_t i = flex_area_idx_t{0}; i < flex_area_idx_t{new_flex_area_transports.size()}; ++i) {
         tt.flex_area_transports_.emplace_back_empty();
         for (auto j : new_flex_area_transports[i]) {
-          tt.flex_area_transports_.back().push_back(j + flex_transport_traffic_days_offset);
+          tt.flex_area_transports_.back().push_back(im.map(j));
         }
       }
       for (auto i : new_flex_transport_traffic_days) {
