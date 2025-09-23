@@ -74,17 +74,19 @@ struct index_mapping {
   location_idx_t location_idx_offset;
   route_idx_t route_idx_offset;
   source_file_idx_t source_file_idx_offset;
+  source_idx_t source_idx_offset;
   timezone_idx_t timezone_idx_offset;
   trip_direction_string_idx_t trip_direction_string_idx_offset;
   trip_idx_t trip_idx_offset;
 
-  index_mapping(timetable first_tt)
+  index_mapping(timetable first_tt, source_idx_t src)
     : alt_name_idx_offset{first_tt.locations_.alt_name_strings_.size()},
       language_idx_offset{first_tt.languages_.size()},
       location_group_idx_offset{first_tt.location_group_name_.size()},
       location_idx_offset{first_tt.n_locations()},
       route_idx_offset{first_tt.n_routes()},
       source_file_idx_offset{first_tt.source_file_names_.size()},
+      source_idx_offset{src},
       timezone_idx_offset{first_tt.locations_.timezones_.size()},
       trip_direction_string_idx_offset{first_tt.trip_direction_strings_.size()},
       trip_idx_offset{first_tt.trip_ids_.size()} {}
@@ -95,6 +97,7 @@ struct index_mapping {
   auto map(location_idx_t i) { return i + location_idx_offset; }
   auto map(route_idx_t i) { return i + route_idx_offset; }
   auto map(source_file_idx_t i) { return i + source_file_idx_offset; }
+  auto map(source_idx_t i) { return i + source_idx_offset; }
   auto map(stop::value_type i) { return to_idx(map(location_idx_t{i})); }
   auto map(timezone_idx_t i) { return i + timezone_idx_offset; }
   auto map(trip_debug i) { return trip_debug{map(i.source_file_idx_), i.line_number_from_, i.line_number_to_}; }
@@ -104,6 +107,7 @@ struct index_mapping {
 
   auto map(fares::fare_leg_join_rule i) { return fares::fare_leg_join_rule{i.from_network_, i.to_network_, map(i.from_stop_), map(i.to_stop_)}; }
   auto map(footpath i) { return footpath{map(i.target()), i.duration()}; }
+  auto map(location_id i) { return location_id{i.id_, map(i.src_)}; }
 
   template<typename T>
   auto map(T i) {
@@ -302,7 +306,7 @@ timetable load(std::vector<timetable_source> const& sources,
       auto new_strings = other_tt.strings_;
       progress_tracker->status("Saved new data");
       /* Add new data and adjust references */
-      auto im = index_mapping(tt);
+      auto im = index_mapping(tt, src);
       /*	bitfields	*/
       auto corrected_indices = vector_map<bitfield_idx_t, bitfield_idx_t>{};
       auto bitfields_ = hash_map<bitfield, bitfield_idx_t>{};
@@ -340,12 +344,10 @@ timetable load(std::vector<timetable_source> const& sources,
         tt.languages_.emplace_back(i);
       }
       /*       location_idx_t	*/
-      auto const source_idx_offset = src;
       {// merge locations struct
         auto&& loc = tt.locations_;
         for (auto i : new_locations.location_id_to_idx_) {
-          auto loc_id = i.first;
-          loc_id.src_ = loc_id.src_ + source_idx_offset;
+          auto loc_id = im.map(i.first);
           auto loc_idx = im.map(i.second);
           auto const [it, is_new] = loc.location_id_to_idx_.emplace(loc_id, loc_idx);
           if (!is_new) {
@@ -374,7 +376,7 @@ timetable load(std::vector<timetable_source> const& sources,
           loc.coordinates_.push_back(i);
         }
         for (auto i: new_locations.src_) {
-          loc.src_.push_back(i + source_idx_offset);
+          loc.src_.push_back(im.map(i));
         }
         for (auto i: new_locations.transfer_time_) {
           loc.transfer_time_.push_back(i);
@@ -611,7 +613,7 @@ timetable load(std::vector<timetable_source> const& sources,
         i.name_ = string_map[i.name_];
         i.url_ = string_map[i.url_];
         i.tz_ = im.map(i.tz_);
-        i.src_ = i.src_ + source_idx_offset;
+        i.src_ = im.map(i.src_);
         tt.providers_.push_back(i);
       }
       for (auto i : new_provider_id_to_idx) {
@@ -625,7 +627,7 @@ timetable load(std::vector<timetable_source> const& sources,
         tt.flex_area_id_.push_back(string_map[i]);
       }
       for (auto i : new_flex_area_src) {
-        tt.flex_area_src_.push_back(i + source_idx_offset);
+        tt.flex_area_src_.push_back(im.map(i));
       }
       //tt.flex_area_locations_ not used during loading
       assert(tt.flex_area_locations_.size() == 0);
@@ -713,7 +715,7 @@ timetable load(std::vector<timetable_source> const& sources,
         }
       }
       for (auto i : new_trip_id_src) {
-        tt.trip_id_src_.push_back(i + source_idx_offset);
+        tt.trip_id_src_.push_back(im.map(i));
       }
       for (auto i : new_trip_id_strings) {
         tt.trip_id_strings_.emplace_back(i);
