@@ -276,6 +276,7 @@ timetable load(std::vector<timetable_source> const& sources,
       auto new_strings = other_tt.strings_;
       progress_tracker->status("Saved new data");
       /* Add new data and adjust references */
+      auto im = index_mapping(tt);
       /*	bitfields	*/
       auto corrected_indices = vector_map<bitfield_idx_t, bitfield_idx_t>{};
       auto bitfields_ = hash_map<bitfield, bitfield_idx_t>{};
@@ -813,7 +814,6 @@ timetable load(std::vector<timetable_source> const& sources,
       for (auto i : new_trip_direction_strings) {
         tt.trip_direction_strings_.emplace_back(i);
       }
-      auto im = index_mapping(tt);
       for (auto i : new_trip_directions) {
         tt.trip_directions_.push_back(im.map(i));
       }
