@@ -76,6 +76,7 @@ struct index_mapping {
   language_idx_t language_idx_offset;
   location_group_idx_t location_group_idx_offset;
   location_idx_t location_idx_offset;
+  merged_trips_idx_t merged_trips_idx_offset;
   provider_idx_t provider_idx_offset;
   route_idx_t route_idx_offset;
   source_file_idx_t source_file_idx_offset;
@@ -95,6 +96,7 @@ struct index_mapping {
       language_idx_offset{first_tt.languages_.size()},
       location_group_idx_offset{first_tt.location_group_name_.size()},
       location_idx_offset{first_tt.n_locations()},
+      merged_trips_idx_offset{first_tt.merged_trips_.size()},
       provider_idx_offset{first_tt.providers_.size()},
       route_idx_offset{first_tt.n_routes()},
       source_file_idx_offset{first_tt.source_file_names_.size()},
@@ -113,6 +115,7 @@ struct index_mapping {
   auto map(language_idx_t i) { return i + language_idx_offset; }
   auto map(location_group_idx_t i) { return i + location_group_idx_offset; }
   auto map(location_idx_t i) { return i + location_idx_offset; }
+  auto map(merged_trips_idx_t i) { return i + merged_trips_idx_offset; }
   auto map(provider_idx_t i) { return i + provider_idx_offset; }
   auto map(route_idx_t i) { return i + route_idx_offset; }
   auto map(source_file_idx_t i) { return i + source_file_idx_offset; }
@@ -809,11 +812,10 @@ timetable load(std::vector<timetable_source> const& sources,
       for (auto i : new_transport_traffic_days) {
         tt.transport_traffic_days_.push_back(corrected_indices[bitfield_idx_t{i}]);
       }
-      auto const merged_trips_idx_offset = merged_trips_idx_t{tt.merged_trips_.size()};
       for (auto i : new_transport_to_trip_section) {
         auto vec = tt.transport_to_trip_section_.add_back_sized(0U);
         for (auto j : i) {
-          vec.push_back(j + merged_trips_idx_offset);
+          vec.push_back(im.map(j));
         }
       }
       for (auto i : new_transport_section_attributes) {
