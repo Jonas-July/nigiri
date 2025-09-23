@@ -86,6 +86,7 @@ struct index_mapping {
   trip_direction_string_idx_t trip_direction_string_idx_offset;
   trip_id_idx_t trip_id_idx_offset;
   trip_idx_t trip_idx_offset;
+  trip_line_idx_t trip_line_idx_offset;
 
   index_mapping(timetable first_tt, source_idx_t src)
     : alt_name_idx_offset{first_tt.locations_.alt_name_strings_.size()},
@@ -105,7 +106,8 @@ struct index_mapping {
       transport_idx_offset{first_tt.transport_traffic_days_.size()},
       trip_direction_string_idx_offset{first_tt.trip_direction_strings_.size()},
       trip_id_idx_offset{first_tt.trip_id_strings_.size()},
-      trip_idx_offset{first_tt.trip_ids_.size()} {}
+      trip_idx_offset{first_tt.trip_ids_.size()},
+      trip_line_idx_offset{first_tt.trip_lines_.size()} {}
 
   auto map(alt_name_idx_t i) { return i + alt_name_idx_offset; }
   auto map(area_idx_t i) { return i + area_idx_offset; }
@@ -128,6 +130,7 @@ struct index_mapping {
   auto map(trip_direction_t i) { return i.apply([&](auto const& d) -> trip_direction_t { return trip_direction_t{map(d)}; });}
   auto map(trip_id_idx_t i) { return i + trip_id_idx_offset; }
   auto map(trip_idx_t i) { return i + trip_idx_offset; }
+  auto map(trip_line_idx_t i) { return i + trip_line_idx_offset; }
 
   auto map(fares::fare_leg_join_rule i) { return fares::fare_leg_join_rule{i.from_network_, i.to_network_, map(i.from_stop_), map(i.to_stop_)}; }
   auto map(fares::fare_leg_rule i) { return fares::fare_leg_rule{
@@ -830,11 +833,10 @@ timetable load(std::vector<timetable_source> const& sources,
       for (auto i : new_transport_section_directions) {
         tt.transport_section_directions_.emplace_back(i);
       }
-      auto const trip_lines_offset = trip_line_idx_t{tt.trip_lines_.size()};
       for (auto i : new_transport_section_lines) {
         auto vec = tt.transport_section_lines_.add_back_sized(0U);
         for (auto j : i) {
-          vec.push_back(j + trip_lines_offset);
+          vec.push_back(im.map(j));
         }
       }
       for (auto i : new_transport_section_route_colors) {
