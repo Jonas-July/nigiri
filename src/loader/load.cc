@@ -84,9 +84,13 @@ struct index_mapping {
   auto map(language_idx_t const& i) const { return i != language_idx_t::invalid() ? i + language_idx_offset_ : language_idx_t::invalid(); }
   auto map(location_idx_t const& i) const { return i != location_idx_t::invalid() ? i + location_idx_offset_ : location_idx_t::invalid(); }
   auto map(source_file_idx_t const& i) const { return i != source_file_idx_t::invalid() ? i + source_file_idx_offset_ : source_file_idx_t::invalid(); }
+  auto map(stop const& i) const { return stop{map(i.location_idx()), i.in_allowed_, i.out_allowed_, i.in_allowed_wheelchair_, i.out_allowed_wheelchair_}; }
   auto map(trip_debug const& i) const { return trip_debug{map(i.source_file_idx_), i.line_number_from_, i.line_number_to_}; }
   auto map(trip_direction_string_idx_t const& i) const { return i != trip_direction_string_idx_t::invalid() ? i + trip_direction_string_idx_offset_ : trip_direction_string_idx_t::invalid(); }
   auto map(trip_direction_t const& i) const { return i.apply([&](auto const& d) -> trip_direction_t { return trip_direction_t{map(d)}; });}
+
+  auto map(fares::fare_leg_join_rule const& i) const { return fares::fare_leg_join_rule{i.from_network_, i.to_network_, map(i.from_stop_), map(i.to_stop_)}; }
+  auto map(footpath const& i) const { return footpath{map(i.target()), i.duration()}; }
 
   template<typename T>
   auto map(T const& i) const {
@@ -324,7 +328,6 @@ timetable load(std::vector<timetable_source> const& sources,
         tt.languages_.emplace_back(i);
       }
       /*       location_idx_t	*/
-      auto const locations_offset = location_idx_t{tt.n_locations()};
       auto const location_group_offset = location_group_idx_t{tt.location_group_name_.size()};
       auto const alt_name_idx_offset = alt_name_idx_t{tt.locations_.alt_name_strings_.size()};
       auto const timezones_offset = timezone_idx_t{tt.locations_.timezones_.size()};
@@ -335,7 +338,7 @@ timetable load(std::vector<timetable_source> const& sources,
         for (auto const& i : new_locations.location_id_to_idx_) {
           auto loc_id = i.first;
           loc_id.src_ = loc_id.src_ != source_idx_t::invalid() ? loc_id.src_ + source_idx_offset : source_idx_t::invalid();
-          auto const loc_idx = i.second != location_idx_t::invalid() ? i.second + locations_offset : location_idx_t::invalid();
+          auto const loc_idx = im.map(i.second);
           auto const [it, is_new] = loc.location_id_to_idx_.emplace(loc_id, loc_idx);
           if (!is_new) {
             log(log_lvl::error, "loader.load", "duplicate station {}", loc_id.id_);
@@ -372,7 +375,7 @@ timetable load(std::vector<timetable_source> const& sources,
           loc.types_.push_back(i);
         }
         for (auto const& i: new_locations.parents_) {
-          loc.parents_.push_back(i != location_idx_t::invalid() ? i + locations_offset : location_idx_t::invalid());
+          loc.parents_.push_back(im.map(i));
         }
         for (auto const& i: new_locations.location_timezones_) {
           loc.location_timezones_.push_back(i != timezone_idx_t::invalid() ? i + timezones_offset : timezone_idx_t::invalid());
@@ -380,29 +383,25 @@ timetable load(std::vector<timetable_source> const& sources,
         for (auto const& i : new_locations.equivalences_) {
           auto entry = loc.equivalences_.emplace_back();
           for (auto const& j : i) {
-            auto loc_idx = j != location_idx_t::invalid() ? j + locations_offset : location_idx_t::invalid();
-            entry.emplace_back(loc_idx);
+            entry.emplace_back(im.map(j));
           }
         }
         for (auto const& i : new_locations.children_) {
           auto entry = loc.children_.emplace_back();
           for (auto const& j : i) {
-            auto loc_idx = j != location_idx_t::invalid() ? j + locations_offset : location_idx_t::invalid();
-            entry.emplace_back(loc_idx);
+            entry.emplace_back(im.map(j));
           }
         }
         for (auto const& i : new_locations.preprocessing_footpaths_out_) {
           auto entry = loc.preprocessing_footpaths_out_.emplace_back();
           for (auto const& j : i) {
-            auto fp = footpath{j.target() != location_idx_t::invalid() ? j.target() + locations_offset : location_idx_t::invalid(), j.duration()};
-            entry.emplace_back(fp);
+            entry.emplace_back(im.map(j));
           }
         }
         for (auto const& i : new_locations.preprocessing_footpaths_in_) {
           auto entry = loc.preprocessing_footpaths_in_.emplace_back();
           for (auto const& j : i) {
-            auto fp = footpath{j.target() != location_idx_t::invalid() ? j.target() + locations_offset : location_idx_t::invalid(), j.duration()};
-            entry.emplace_back(fp);
+            entry.emplace_back(im.map(j));
           }
         }
         /*
@@ -458,7 +457,7 @@ timetable load(std::vector<timetable_source> const& sources,
       for (location_group_idx_t i = location_group_idx_t{0}; i < location_group_idx_t{new_location_group_locations.size()}; ++i) {
         tt.location_group_locations_.emplace_back_empty();
         for (auto const& j : new_location_group_locations[location_group_idx_t{i}]) {
-          tt.location_group_locations_.back().push_back(j != location_idx_t::invalid() ? j + locations_offset : location_idx_t::invalid());
+          tt.location_group_locations_.back().push_back(im.map(j));
         }
       }
       //tt.fwd_search_lb_graph_ not used during loading
@@ -481,10 +480,7 @@ timetable load(std::vector<timetable_source> const& sources,
       for (auto const& i : new_route_location_seq) {
         auto vec = tt.route_location_seq_.add_back_sized(0U);
         for (auto const& j : i) {
-          auto const s = stop{j};
-          auto const mapped_location_idx = s.location_idx() != location_idx_t::invalid() ? s.location_idx() + locations_offset : location_idx_t::invalid();
-          auto const mapped_stop = stop{mapped_location_idx, s.in_allowed_, s.out_allowed_, s.in_allowed_wheelchair_, s.out_allowed_wheelchair_};
-          vec.push_back(mapped_stop.value());
+          vec.push_back(im.map(stop{j}).value());
         }
       }
       for (auto const& i : new_route_clasz) {
@@ -571,13 +567,7 @@ timetable load(std::vector<timetable_source> const& sources,
         }
         auto mapped_fare_leg_join_rules = vector<fares::fare_leg_join_rule>{};
         for (auto const& j : i.fare_leg_join_rules_) {
-          auto const mapped_join_rule = fares::fare_leg_join_rule{
-            .from_network_ = j.from_network_,
-            .to_network_ = j.to_network_,
-            .from_stop_ = j.from_stop_ != location_idx_t::invalid() ? j.from_stop_ + locations_offset : location_idx_t::invalid(),
-            .to_stop_   = j.to_stop_   != location_idx_t::invalid() ? j.to_stop_   + locations_offset : location_idx_t::invalid()
-          };
-          mapped_fare_leg_join_rules.push_back(mapped_join_rule);
+          mapped_fare_leg_join_rules.push_back(im.map(j));
         }
         auto mapped_rider_categories = vector_map<rider_category_idx_t, fares::rider_category>{};
         for (auto const& j : i.rider_categories_) {
