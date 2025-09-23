@@ -88,6 +88,7 @@ struct index_mapping {
   trip_direction_string_idx_t const trip_direction_string_idx_offset_;
   trip_id_idx_t const trip_id_idx_offset_;
   trip_idx_t const trip_idx_offset_;
+  trip_line_idx_t const trip_line_idx_offset_;
 
   index_mapping(timetable const& first_tt)
     : alt_name_idx_offset_{first_tt.locations_.alt_name_strings_.size()},
@@ -107,7 +108,8 @@ struct index_mapping {
       transport_idx_offset_{first_tt.transport_traffic_days_.size()},
       trip_direction_string_idx_offset_{first_tt.trip_direction_strings_.size()},
       trip_id_idx_offset_{first_tt.trip_id_strings_.size()},
-      trip_idx_offset_{first_tt.trip_ids_.size()} {}
+      trip_idx_offset_{first_tt.trip_ids_.size()},
+      trip_line_idx_offset_{first_tt.trip_lines_.size()} {}
 
   auto map(alt_name_idx_t const& i) const { return i != alt_name_idx_t::invalid() ? i + alt_name_idx_offset_ : alt_name_idx_t::invalid(); }
   auto map(area_idx_t const& i) const { return i != area_idx_t::invalid() ? i + area_idx_offset_ : area_idx_t::invalid(); }
@@ -130,6 +132,7 @@ struct index_mapping {
   auto map(trip_direction_t const& i) const { return i.apply([&](auto const& d) -> trip_direction_t { return trip_direction_t{map(d)}; });}
   auto map(trip_id_idx_t const& i) const { return i != trip_id_idx_t::invalid() ? i + trip_id_idx_offset_ : trip_id_idx_t::invalid(); }
   auto map(trip_idx_t const& i) const { return i != trip_idx_t::invalid() ? i + trip_idx_offset_ : trip_idx_t::invalid(); }
+  auto map(trip_line_idx_t const& i) const { return i != trip_line_idx_t::invalid() ? i + trip_line_idx_offset_ : trip_line_idx_t::invalid(); }
 
   auto map(fares::fare_leg_join_rule const& i) const { return fares::fare_leg_join_rule{i.from_network_, i.to_network_, map(i.from_stop_), map(i.to_stop_)}; }
   auto map(fares::fare_leg_rule const& i) const { return fares::fare_leg_rule{
@@ -869,11 +872,10 @@ timetable load(std::vector<timetable_source> const& sources,
       for (auto const& i : new_transport_section_directions) {
         tt.transport_section_directions_.emplace_back(i);
       }
-      auto const trip_lines_offset = trip_line_idx_t{tt.trip_lines_.size()};
       for (auto const& i : new_transport_section_lines) {
         auto vec = tt.transport_section_lines_.add_back_sized(0U);
         for (auto const& j : i) {
-          vec.push_back(j != trip_line_idx_t::invalid() ? j + trip_lines_offset : trip_line_idx_t::invalid());
+          vec.push_back(im.map(j));
         }
       }
       for (auto const& i : new_transport_section_route_colors) {
