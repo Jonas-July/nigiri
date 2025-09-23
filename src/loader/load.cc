@@ -73,6 +73,7 @@ struct index_mapping {
   location_group_idx_t location_group_idx_offset;
   location_idx_t location_idx_offset;
   source_file_idx_t source_file_idx_offset;
+  timezone_idx_t timezone_idx_offset;
   trip_direction_string_idx_t trip_direction_string_idx_offset;
 
   index_mapping(timetable first_tt)
@@ -81,6 +82,7 @@ struct index_mapping {
       location_group_idx_offset{first_tt.location_group_name_.size()},
       location_idx_offset{first_tt.n_locations()},
       source_file_idx_offset{first_tt.source_file_names_.size()},
+      timezone_idx_offset{first_tt.locations_.timezones_.size()},
       trip_direction_string_idx_offset{first_tt.trip_direction_strings_.size()} {}
 
   auto map(alt_name_idx_t i) { return i + alt_name_idx_offset; }
@@ -89,6 +91,7 @@ struct index_mapping {
   auto map(location_idx_t i) { return i + location_idx_offset; }
   auto map(source_file_idx_t i) { return i + source_file_idx_offset; }
   auto map(stop::value_type i) { return to_idx(map(location_idx_t{i})); }
+  auto map(timezone_idx_t i) { return i + timezone_idx_offset; }
   auto map(trip_debug i) { return trip_debug{map(i.source_file_idx_), i.line_number_from_, i.line_number_to_}; }
   auto map(trip_direction_string_idx_t i) { return i + trip_direction_string_idx_offset; }
   auto map(trip_direction_t i) { return i.apply([&](auto const& d) -> trip_direction_t { return trip_direction_t{map(d)}; });}
@@ -331,7 +334,6 @@ timetable load(std::vector<timetable_source> const& sources,
         tt.languages_.emplace_back(i);
       }
       /*       location_idx_t	*/
-      auto const timezones_offset = timezone_idx_t{tt.locations_.timezones_.size()};
       auto const trip_offset = trip_idx_t{tt.trip_ids_.size()};
       auto const route_idx_offset = route_idx_t{tt.n_routes()};
       auto const source_idx_offset = src;
@@ -380,7 +382,7 @@ timetable load(std::vector<timetable_source> const& sources,
           loc.parents_.push_back(im.map(i));
         }
         for (auto i: new_locations.location_timezones_) {
-          loc.location_timezones_.push_back(i + timezones_offset);
+          loc.location_timezones_.push_back(im.map(i));
         }
         for (auto i : new_locations.equivalences_) {
           auto entry = loc.equivalences_.emplace_back();
@@ -604,7 +606,7 @@ timetable load(std::vector<timetable_source> const& sources,
         i.id_ = string_map[i.id_];
         i.name_ = string_map[i.name_];
         i.url_ = string_map[i.url_];
-        i.tz_ = i.tz_ + timezones_offset;
+        i.tz_ = im.map(i.tz_);
         i.src_ = i.src_ + source_idx_offset;
         tt.providers_.push_back(i);
       }
