@@ -69,13 +69,17 @@ struct change_detector {
 
 struct index_mapping {
   location_idx_t location_idx_offset;
+  source_file_idx_t source_file_idx_offset;
   trip_direction_string_idx_t trip_direction_string_idx_offset;
 
   index_mapping(timetable first_tt)
     : location_idx_offset{first_tt.n_locations()},
+      source_file_idx_offset{first_tt.source_file_names_.size()},
       trip_direction_string_idx_offset{first_tt.trip_direction_strings_.size()} {}
 
   auto map(location_idx_t i) { return i + location_idx_offset; }
+  auto map(source_file_idx_t i) { return i + source_file_idx_offset; }
+  auto map(trip_debug i) { return trip_debug{map(i.source_file_idx_), i.line_number_from_, i.line_number_to_}; }
   auto map(trip_direction_string_idx_t i) { return i + trip_direction_string_idx_offset; }
   auto map(trip_direction_t i) { return i.apply([&](auto const& d) -> trip_direction_t { return trip_direction_t{map(d)}; });}
 
@@ -300,15 +304,13 @@ timetable load(std::vector<timetable_source> const& sources,
       for (auto i : new_source_end_date) {
         tt.src_end_date_.push_back(i);
       }
-      auto const source_file_names_offset = source_file_idx_t{tt.source_file_names_.size()};
       for (auto i : new_source_file_names) {
         tt.source_file_names_.emplace_back(i);
       }
       for (auto i : new_trip_debug) {
         auto entry = tt.trip_debug_.emplace_back();
         for (auto j : i) {
-          auto debug = trip_debug{j.source_file_idx_ + source_file_names_offset, j.line_number_from_, j.line_number_to_};
-          entry.emplace_back(debug);
+          entry.emplace_back(im.map(j));
         }
       }
       /*	 languages	*/
