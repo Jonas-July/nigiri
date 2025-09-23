@@ -69,17 +69,20 @@ struct change_detector {
 
 struct index_mapping {
   language_idx_t language_idx_offset;
+  location_group_idx_t location_group_idx_offset;
   location_idx_t location_idx_offset;
   source_file_idx_t source_file_idx_offset;
   trip_direction_string_idx_t trip_direction_string_idx_offset;
 
   index_mapping(timetable first_tt)
     : language_idx_offset{first_tt.languages_.size()},
+      location_group_idx_offset{first_tt.location_group_name_.size()},
       location_idx_offset{first_tt.n_locations()},
       source_file_idx_offset{first_tt.source_file_names_.size()},
       trip_direction_string_idx_offset{first_tt.trip_direction_strings_.size()} {}
 
   auto map(language_idx_t i) { return i + language_idx_offset; }
+  auto map(location_group_idx_t i) { return i + location_group_idx_offset; }
   auto map(location_idx_t i) { return i + location_idx_offset; }
   auto map(source_file_idx_t i) { return i + source_file_idx_offset; }
   auto map(stop::value_type i) { return to_idx(map(location_idx_t{i})); }
@@ -325,7 +328,6 @@ timetable load(std::vector<timetable_source> const& sources,
         tt.languages_.emplace_back(i);
       }
       /*       location_idx_t	*/
-      auto const location_group_offset = location_group_idx_t{tt.location_group_name_.size()};
       auto const alt_name_idx_offset = alt_name_idx_t{tt.locations_.alt_name_strings_.size()};
       auto const timezones_offset = timezone_idx_t{tt.locations_.timezones_.size()};
       auto const trip_offset = trip_idx_t{tt.trip_ids_.size()};
@@ -449,7 +451,7 @@ timetable load(std::vector<timetable_source> const& sources,
       for (location_idx_t i = location_idx_t{0}; i < location_idx_t{new_location_location_groups.size()}; ++i) {
         tt.location_location_groups_.emplace_back_empty();
         for (auto j : new_location_location_groups[i]) {
-          tt.location_location_groups_.back().push_back(j + location_group_offset);
+          tt.location_location_groups_.back().push_back(im.map(j));
         }
       }
       for (location_group_idx_t i = location_group_idx_t{0}; i < location_group_idx_t{new_location_group_locations.size()}; ++i) {
