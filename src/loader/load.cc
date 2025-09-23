@@ -78,6 +78,7 @@ struct index_mapping {
   language_idx_t const language_idx_offset_;
   location_group_idx_t const location_group_idx_offset_;
   location_idx_t const location_idx_offset_;
+  merged_trips_idx_t const merged_trips_idx_offset_;
   provider_idx_t const provider_idx_offset_;
   route_idx_t const route_idx_offset_;
   source_file_idx_t const source_file_idx_offset_;
@@ -97,6 +98,7 @@ struct index_mapping {
       language_idx_offset_{first_tt.languages_.size()},
       location_group_idx_offset_{first_tt.location_group_name_.size()},
       location_idx_offset_{first_tt.n_locations()},
+      merged_trips_idx_offset_{first_tt.merged_trips_.size()},
       provider_idx_offset_{first_tt.providers_.size()},
       route_idx_offset_{first_tt.n_routes()},
       source_file_idx_offset_{first_tt.source_file_names_.size()},
@@ -115,6 +117,7 @@ struct index_mapping {
   auto map(language_idx_t const& i) const { return i != language_idx_t::invalid() ? i + language_idx_offset_ : language_idx_t::invalid(); }
   auto map(location_group_idx_t const& i) const { return i != location_group_idx_t::invalid() ? i + location_group_idx_offset_ : location_group_idx_t::invalid(); }
   auto map(location_idx_t const& i) const { return i != location_idx_t::invalid() ? i + location_idx_offset_ : location_idx_t::invalid(); }
+  auto map(merged_trips_idx_t const& i) const { return i != merged_trips_idx_t::invalid() ? i + merged_trips_idx_offset_ : merged_trips_idx_t::invalid(); }
   auto map(provider_idx_t const& i) const { return i != provider_idx_t::invalid() ? i + provider_idx_offset_ : provider_idx_t::invalid(); }
   auto map(route_idx_t const& i) const { return i != route_idx_t::invalid() ? i + route_idx_offset_ : route_idx_t::invalid(); }
   auto map(source_file_idx_t const& i) const { return i != source_file_idx_t::invalid() ? i + source_file_idx_offset_ : source_file_idx_t::invalid(); }
@@ -809,7 +812,6 @@ timetable load(std::vector<timetable_source> const& sources,
       for (auto const& i : new_trip_display_names) {
         tt.trip_display_names_.emplace_back(i);
       }
-      auto const merged_trips_idx_offset = merged_trips_idx_t{tt.merged_trips_.size()};
       for (auto const& i : new_merged_trips) {
         auto vec = tt.merged_trips_.add_back_sized(0U);
         for (auto const& j : i) {
@@ -852,7 +854,7 @@ timetable load(std::vector<timetable_source> const& sources,
       for (auto const& i : new_transport_to_trip_section) {
         auto vec = tt.transport_to_trip_section_.add_back_sized(0U);
         for (auto const& j : i) {
-          vec.push_back(j != merged_trips_idx_t::invalid() ? j + merged_trips_idx_offset : merged_trips_idx_t::invalid());
+          vec.push_back(im.map(j));
         }
       }
       for (auto const& i : new_transport_section_attributes) {
