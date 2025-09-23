@@ -69,6 +69,7 @@ struct change_detector {
 
 struct index_mapping {
   alt_name_idx_t alt_name_idx_offset;
+  area_idx_t area_idx_offset;
   language_idx_t language_idx_offset;
   location_group_idx_t location_group_idx_offset;
   location_idx_t location_idx_offset;
@@ -81,6 +82,7 @@ struct index_mapping {
 
   index_mapping(timetable first_tt, source_idx_t src)
     : alt_name_idx_offset{first_tt.locations_.alt_name_strings_.size()},
+      area_idx_offset{first_tt.areas_.size()},
       language_idx_offset{first_tt.languages_.size()},
       location_group_idx_offset{first_tt.location_group_name_.size()},
       location_idx_offset{first_tt.n_locations()},
@@ -92,6 +94,7 @@ struct index_mapping {
       trip_idx_offset{first_tt.trip_ids_.size()} {}
 
   auto map(alt_name_idx_t i) { return i + alt_name_idx_offset; }
+  auto map(area_idx_t i) { return i + area_idx_offset; }
   auto map(language_idx_t i) { return i + language_idx_offset; }
   auto map(location_group_idx_t i) { return i + location_group_idx_offset; }
   auto map(location_idx_t i) { return i + location_idx_offset; }
@@ -106,6 +109,18 @@ struct index_mapping {
   auto map(trip_idx_t i) { return i + trip_idx_offset; }
 
   auto map(fares::fare_leg_join_rule i) { return fares::fare_leg_join_rule{i.from_network_, i.to_network_, map(i.from_stop_), map(i.to_stop_)}; }
+  auto map(fares::fare_leg_rule i) { return fares::fare_leg_rule{
+                                       .rule_priority_ = i.rule_priority_,
+                                       .network_ = i.network_,
+                                       .from_area_ = map(i.from_area_),
+                                       .to_area_ = map(i.to_area_),
+                                       .from_timeframe_group_ = i.from_timeframe_group_,
+                                       .to_timeframe_group_ = i.to_timeframe_group_,
+                                       .fare_product_ = i.fare_product_,
+                                       .leg_group_idx_ = i.leg_group_idx_,
+                                       .contains_exactly_area_set_id_ = i.contains_exactly_area_set_id_,
+                                       .contains_area_set_id_ = i.contains_area_set_id_};
+                                   }
   auto map(footpath i) { return footpath{map(i.target()), i.duration()}; }
   auto map(location_id i) { return location_id{i.id_, map(i.src_)}; }
 
@@ -451,11 +466,10 @@ timetable load(std::vector<timetable_source> const& sources,
           vec.push_back(im.map(j));
         }
       }
-      auto const area_idx_offset = area_idx_t{tt.areas_.size()};
       for (auto i : new_location_areas) {
         auto vec = tt.location_areas_.add_back_sized(0U);
         for (auto j : i) {
-          vec.push_back(j + area_idx_offset);
+          vec.push_back(im.map(j));
         }
       }
       for (location_idx_t i = location_idx_t{0}; i < location_idx_t{new_location_location_groups.size()}; ++i) {
@@ -549,9 +563,7 @@ timetable load(std::vector<timetable_source> const& sources,
         }
         auto new_fare_leg_rules = vector<fares::fare_leg_rule>{};
         for (auto j : i.fare_leg_rules_) {
-          j.from_area_ = j.from_area_ + area_idx_offset;
-          j.to_area_ = j.to_area_ + area_idx_offset;
-          new_fare_leg_rules.push_back(j);
+          new_fare_leg_rules.push_back(im.map(j));
         }
         auto new_fare_leg_join_rules = vector<fares::fare_leg_join_rule>{};
         for (auto j : i.fare_leg_join_rules_) {
@@ -585,7 +597,7 @@ timetable load(std::vector<timetable_source> const& sources,
         for (auto j : i.area_sets_) {
           auto vec = new_area_sets.add_back_sized(0U);
           for (auto k : j) {
-             vec.push_back(k + area_idx_offset);
+             vec.push_back(im.map(k));
           }
         }
         auto new_area_set_ids = vector_map<area_set_idx_t, string_idx_t>{};
