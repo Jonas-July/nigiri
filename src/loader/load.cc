@@ -70,6 +70,7 @@ struct change_detector {
 struct index_mapping {
   alt_name_idx_t alt_name_idx_offset;
   area_idx_t area_idx_offset;
+  booking_rule_idx_t booking_rule_idx_offset;
   flex_stop_seq_idx_t flex_stop_seq_idx_offset;
   flex_transport_idx_t flex_transport_idx_offset;
   language_idx_t language_idx_offset;
@@ -87,6 +88,7 @@ struct index_mapping {
   index_mapping(timetable first_tt, source_idx_t src)
     : alt_name_idx_offset{first_tt.locations_.alt_name_strings_.size()},
       area_idx_offset{first_tt.areas_.size()},
+      booking_rule_idx_offset{first_tt.booking_rules_.size()},
       flex_stop_seq_idx_offset{first_tt.flex_stop_seq_.size()},
       flex_transport_idx_offset{first_tt.flex_transport_traffic_days_.size()},
       language_idx_offset{first_tt.languages_.size()},
@@ -103,6 +105,7 @@ struct index_mapping {
 
   auto map(alt_name_idx_t i) { return i + alt_name_idx_offset; }
   auto map(area_idx_t i) { return i + area_idx_offset; }
+  auto map(booking_rule_idx_t i) { return i + booking_rule_idx_offset; }
   auto map(flex_stop_seq_idx_t i) { return i + flex_stop_seq_idx_offset; }
   auto map(flex_transport_idx_t i) { return i + flex_transport_idx_offset; }
   auto map(language_idx_t i) { return i + language_idx_offset; }
@@ -704,17 +707,16 @@ timetable load(std::vector<timetable_source> const& sources,
       for (auto i : new_flex_stop_seq) {
         tt.flex_stop_seq_.emplace_back(i);
       }
-      auto booking_rules_offset = booking_rule_idx_t{tt.booking_rules_.size()};
       for (auto i : new_flex_transport_pickup_booking_rule) {
         auto vec = tt.flex_transport_pickup_booking_rule_.add_back_sized(0U);
         for (auto j : i) {
-          vec.push_back(j + booking_rules_offset);
+          vec.push_back(im.map(j));
         }
       }
       for (auto i : new_flex_transport_drop_off_booking_rule) {
         auto vec = tt.flex_transport_drop_off_booking_rule_.add_back_sized(0U);
         for (auto j : i) {
-          vec.push_back(j + booking_rules_offset);
+          vec.push_back(im.map(j));
         }
       }
       for (auto i : new_booking_rules) {
