@@ -68,6 +68,7 @@ struct change_detector {
 };
 
 struct index_mapping {
+  alt_name_idx_t alt_name_idx_offset;
   language_idx_t language_idx_offset;
   location_group_idx_t location_group_idx_offset;
   location_idx_t location_idx_offset;
@@ -75,12 +76,14 @@ struct index_mapping {
   trip_direction_string_idx_t trip_direction_string_idx_offset;
 
   index_mapping(timetable first_tt)
-    : language_idx_offset{first_tt.languages_.size()},
+    : alt_name_idx_offset{first_tt.locations_.alt_name_strings_.size()},
+      language_idx_offset{first_tt.languages_.size()},
       location_group_idx_offset{first_tt.location_group_name_.size()},
       location_idx_offset{first_tt.n_locations()},
       source_file_idx_offset{first_tt.source_file_names_.size()},
       trip_direction_string_idx_offset{first_tt.trip_direction_strings_.size()} {}
 
+  auto map(alt_name_idx_t i) { return i + alt_name_idx_offset; }
   auto map(language_idx_t i) { return i + language_idx_offset; }
   auto map(location_group_idx_t i) { return i + location_group_idx_offset; }
   auto map(location_idx_t i) { return i + location_idx_offset; }
@@ -328,7 +331,6 @@ timetable load(std::vector<timetable_source> const& sources,
         tt.languages_.emplace_back(i);
       }
       /*       location_idx_t	*/
-      auto const alt_name_idx_offset = alt_name_idx_t{tt.locations_.alt_name_strings_.size()};
       auto const timezones_offset = timezone_idx_t{tt.locations_.timezones_.size()};
       auto const trip_offset = trip_idx_t{tt.trip_ids_.size()};
       auto const route_idx_offset = route_idx_t{tt.n_routes()};
@@ -359,7 +361,7 @@ timetable load(std::vector<timetable_source> const& sources,
         for (auto i : new_locations.alt_names_) {
           auto vec = loc.alt_names_.add_back_sized(0U);
           for (auto j : i) {
-            vec.push_back(j + alt_name_idx_offset);
+            vec.push_back(im.map(j));
           }
         }
         for (auto i: new_locations.coordinates_) {
