@@ -75,6 +75,7 @@ struct index_mapping {
   source_file_idx_t source_file_idx_offset;
   timezone_idx_t timezone_idx_offset;
   trip_direction_string_idx_t trip_direction_string_idx_offset;
+  trip_idx_t trip_idx_offset;
 
   index_mapping(timetable first_tt)
     : alt_name_idx_offset{first_tt.locations_.alt_name_strings_.size()},
@@ -83,7 +84,8 @@ struct index_mapping {
       location_idx_offset{first_tt.n_locations()},
       source_file_idx_offset{first_tt.source_file_names_.size()},
       timezone_idx_offset{first_tt.locations_.timezones_.size()},
-      trip_direction_string_idx_offset{first_tt.trip_direction_strings_.size()} {}
+      trip_direction_string_idx_offset{first_tt.trip_direction_strings_.size()},
+      trip_idx_offset{first_tt.trip_ids_.size()} {}
 
   auto map(alt_name_idx_t i) { return i + alt_name_idx_offset; }
   auto map(language_idx_t i) { return i + language_idx_offset; }
@@ -95,6 +97,7 @@ struct index_mapping {
   auto map(trip_debug i) { return trip_debug{map(i.source_file_idx_), i.line_number_from_, i.line_number_to_}; }
   auto map(trip_direction_string_idx_t i) { return i + trip_direction_string_idx_offset; }
   auto map(trip_direction_t i) { return i.apply([&](auto const& d) -> trip_direction_t { return trip_direction_t{map(d)}; });}
+  auto map(trip_idx_t i) { return i + trip_idx_offset; }
 
   auto map(fares::fare_leg_join_rule i) { return fares::fare_leg_join_rule{i.from_network_, i.to_network_, map(i.from_stop_), map(i.to_stop_)}; }
   auto map(footpath i) { return footpath{map(i.target()), i.duration()}; }
@@ -334,7 +337,6 @@ timetable load(std::vector<timetable_source> const& sources,
         tt.languages_.emplace_back(i);
       }
       /*       location_idx_t	*/
-      auto const trip_offset = trip_idx_t{tt.trip_ids_.size()};
       auto const route_idx_offset = route_idx_t{tt.n_routes()};
       auto const source_idx_offset = src;
       {// merge locations struct
@@ -661,7 +663,7 @@ timetable load(std::vector<timetable_source> const& sources,
         tt.flex_transport_traffic_days_.push_back(corrected_indices[bitfield_idx_t{i}]);
       }
       for (auto i : new_flex_transport_trip) {
-        tt.flex_transport_trip_.push_back(i + trip_offset);
+        tt.flex_transport_trip_.push_back(im.map(i));
       }
       for (auto i : new_flex_transport_stop_time_windows) {
         tt.flex_transport_stop_time_windows_.emplace_back(i);
@@ -699,7 +701,7 @@ timetable load(std::vector<timetable_source> const& sources,
       /*      trip_id_idx_t	*/
       auto trip_id_offset = trip_id_idx_t{tt.trip_id_strings_.size()};
       for (auto i : new_trip_id_to_idx) {
-        tt.trip_id_to_idx_.push_back(pair<trip_id_idx_t, trip_idx_t>{i.first + trip_id_offset, i.second + trip_offset});
+        tt.trip_id_to_idx_.push_back(pair<trip_id_idx_t, trip_idx_t>{i.first + trip_id_offset, im.map(i.second)});
       }
       for (auto i : new_trip_ids) {
         auto entry = tt.trip_ids_.emplace_back();
@@ -718,9 +720,9 @@ timetable load(std::vector<timetable_source> const& sources,
       assert(tt.trip_train_nr_.size() == 0);
       /* 	 trip_idx_t	 */
       auto add_size = trip_idx_t{new_trip_direction_id.size()};
-      tt.trip_direction_id_.resize(to_idx(trip_offset + add_size));
+      tt.trip_direction_id_.resize(to_idx(im.map(add_size)));
       for (auto i = trip_idx_t{0U}; i < add_size; ++i) {
-        tt.trip_direction_id_.set(i + trip_offset, new_trip_direction_id.test(i));
+        tt.trip_direction_id_.set(im.map(i), new_trip_direction_id.test(i));
       }
       for (auto i : new_trip_route_id) {
         tt.trip_route_id_.push_back(i);
@@ -740,7 +742,7 @@ timetable load(std::vector<timetable_source> const& sources,
       for (auto i : new_merged_trips) {
         auto vec = tt.merged_trips_.add_back_sized(0U);
         for (auto j : i) {
-          vec.push_back(j + trip_offset);
+          vec.push_back(im.map(j));
         }
       }
       /*      route_id_idx_t	 */
@@ -749,7 +751,7 @@ timetable load(std::vector<timetable_source> const& sources,
         for (auto j = route_id_idx_t{0U}; j < i.route_id_trips_.size(); ++j) {
           vec.emplace_back_empty();
           for (auto k : i.route_id_trips_[j]) {
-            vec.back().push_back(k + trip_offset);
+            vec.back().push_back(im.map(k));
           }
         }
         auto providers = vector_map<route_id_idx_t, provider_idx_t>{};
