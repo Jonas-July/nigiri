@@ -83,6 +83,7 @@ struct index_mapping {
   timezone_idx_t timezone_idx_offset;
   transport_idx_t transport_idx_offset;
   trip_direction_string_idx_t trip_direction_string_idx_offset;
+  trip_id_idx_t trip_id_idx_offset;
   trip_idx_t trip_idx_offset;
 
   index_mapping(timetable first_tt, source_idx_t src)
@@ -101,6 +102,7 @@ struct index_mapping {
       timezone_idx_offset{first_tt.locations_.timezones_.size()},
       transport_idx_offset{first_tt.transport_traffic_days_.size()},
       trip_direction_string_idx_offset{first_tt.trip_direction_strings_.size()},
+      trip_id_idx_offset{first_tt.trip_id_strings_.size()},
       trip_idx_offset{first_tt.trip_ids_.size()} {}
 
   auto map(alt_name_idx_t i) { return i + alt_name_idx_offset; }
@@ -121,6 +123,7 @@ struct index_mapping {
   auto map(trip_debug i) { return trip_debug{map(i.source_file_idx_), i.line_number_from_, i.line_number_to_}; }
   auto map(trip_direction_string_idx_t i) { return i + trip_direction_string_idx_offset; }
   auto map(trip_direction_t i) { return i.apply([&](auto const& d) -> trip_direction_t { return trip_direction_t{map(d)}; });}
+  auto map(trip_id_idx_t i) { return i + trip_id_idx_offset; }
   auto map(trip_idx_t i) { return i + trip_idx_offset; }
 
   auto map(fares::fare_leg_join_rule i) { return fares::fare_leg_join_rule{i.from_network_, i.to_network_, map(i.from_stop_), map(i.to_stop_)}; }
@@ -142,6 +145,11 @@ struct index_mapping {
   template<typename T>
   auto map(interval<T> i) {
     return interval{map(i.from_), map(i.to_)};
+  }
+
+  template<typename T1, typename T2>
+  auto map(pair<T1, T2> i) {
+    return pair<T1, T2>{map(i.first), map(i.second)};
   }
 
   template<typename T>
@@ -730,14 +738,13 @@ timetable load(std::vector<timetable_source> const& sources,
         tt.booking_rules_.push_back(i);
       }
       /*      trip_id_idx_t	*/
-      auto trip_id_offset = trip_id_idx_t{tt.trip_id_strings_.size()};
       for (auto i : new_trip_id_to_idx) {
-        tt.trip_id_to_idx_.push_back(pair<trip_id_idx_t, trip_idx_t>{i.first + trip_id_offset, im.map(i.second)});
+        tt.trip_id_to_idx_.push_back(im.map(i));
       }
       for (auto i : new_trip_ids) {
         auto entry = tt.trip_ids_.emplace_back();
         for (auto j : i) {
-          auto trip_id = trip_id_idx_t{j + trip_id_offset};
+          auto trip_id = trip_id_idx_t{im.map(j)};
           entry.emplace_back(trip_id);
         }
       }
