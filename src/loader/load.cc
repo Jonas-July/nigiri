@@ -125,15 +125,15 @@ struct index_mapping {
   auto map(route_idx_t i) { return i + route_idx_offset; }
   auto map(source_file_idx_t i) { return i + source_file_idx_offset; }
   auto map(source_idx_t i) { return i + source_idx_offset; }
-  auto map(stop::value_type i) { return to_idx(map(location_idx_t{i})); }
   auto map(timezone_idx_t i) { return i + timezone_idx_offset; }
   auto map(transport_idx_t i) { return i + transport_idx_offset; }
-  auto map(trip_debug i) { return trip_debug{map(i.source_file_idx_), i.line_number_from_, i.line_number_to_}; }
   auto map(trip_direction_string_idx_t i) { return i + trip_direction_string_idx_offset; }
-  auto map(trip_direction_t i) { return i.apply([&](auto const& d) -> trip_direction_t { return trip_direction_t{map(d)}; });}
   auto map(trip_id_idx_t i) { return i + trip_id_idx_offset; }
   auto map(trip_idx_t i) { return i + trip_idx_offset; }
   auto map(trip_line_idx_t i) { return i + trip_line_idx_offset; }
+
+  auto map(stop::value_type i) { return to_idx(map(location_idx_t{i})); }
+  auto map(trip_direction_t i) { return i.apply([&](auto const& d) -> trip_direction_t { return trip_direction_t{map(d)}; });}
 
   auto map(fares::fare_leg_join_rule i) { return fares::fare_leg_join_rule{i.from_network_, i.to_network_, map(i.from_stop_), map(i.to_stop_)}; }
   auto map(fares::fare_leg_rule i) { return fares::fare_leg_rule{
@@ -150,6 +150,7 @@ struct index_mapping {
                                    }
   auto map(footpath i) { return footpath{map(i.target()), i.duration()}; }
   auto map(location_id i) { return location_id{i.id_, map(i.src_)}; }
+  auto map(trip_debug i) { return trip_debug{map(i.source_file_idx_), i.line_number_from_, i.line_number_to_}; }
 
   template<typename T>
   auto map(interval<T> i) {
