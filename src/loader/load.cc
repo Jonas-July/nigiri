@@ -127,15 +127,15 @@ struct index_mapping {
   auto map(route_idx_t const& i) const { return i != route_idx_t::invalid() ? i + route_idx_offset_ : route_idx_t::invalid(); }
   auto map(source_file_idx_t const& i) const { return i != source_file_idx_t::invalid() ? i + source_file_idx_offset_ : source_file_idx_t::invalid(); }
   auto map(source_idx_t const& i) const { return i != source_idx_t::invalid() ? i + source_idx_offset_ : source_idx_t::invalid(); }
-  auto map(stop const& i) const { return stop{map(i.location_idx()), i.in_allowed_, i.out_allowed_, i.in_allowed_wheelchair_, i.out_allowed_wheelchair_}; }
   auto map(timezone_idx_t const& i) const { return i != timezone_idx_t::invalid() ? i + timezone_idx_offset_ : timezone_idx_t::invalid(); }
   auto map(transport_idx_t const& i) const { return i != transport_idx_t::invalid() ? i + transport_idx_offset_ : transport_idx_t::invalid(); }
-  auto map(trip_debug const& i) const { return trip_debug{map(i.source_file_idx_), i.line_number_from_, i.line_number_to_}; }
   auto map(trip_direction_string_idx_t const& i) const { return i != trip_direction_string_idx_t::invalid() ? i + trip_direction_string_idx_offset_ : trip_direction_string_idx_t::invalid(); }
-  auto map(trip_direction_t const& i) const { return i.apply([&](auto const& d) -> trip_direction_t { return trip_direction_t{map(d)}; });}
   auto map(trip_id_idx_t const& i) const { return i != trip_id_idx_t::invalid() ? i + trip_id_idx_offset_ : trip_id_idx_t::invalid(); }
   auto map(trip_idx_t const& i) const { return i != trip_idx_t::invalid() ? i + trip_idx_offset_ : trip_idx_t::invalid(); }
   auto map(trip_line_idx_t const& i) const { return i != trip_line_idx_t::invalid() ? i + trip_line_idx_offset_ : trip_line_idx_t::invalid(); }
+
+  auto map(stop const& i) const { return stop{map(i.location_idx()), i.in_allowed_, i.out_allowed_, i.in_allowed_wheelchair_, i.out_allowed_wheelchair_}; }
+  auto map(trip_direction_t const& i) const { return i.apply([&](auto const& d) -> trip_direction_t { return trip_direction_t{map(d)}; });}
 
   auto map(fares::fare_leg_join_rule const& i) const { return fares::fare_leg_join_rule{i.from_network_, i.to_network_, map(i.from_stop_), map(i.to_stop_)}; }
   auto map(fares::fare_leg_rule const& i) const { return fares::fare_leg_rule{
@@ -152,6 +152,7 @@ struct index_mapping {
                                                 }
   auto map(footpath const& i) const { return footpath{map(i.target()), i.duration()}; }
   auto map(location_id const& i) const { return location_id{i.id_, map(i.src_)}; }
+  auto map(trip_debug const& i) const { return trip_debug{map(i.source_file_idx_), i.line_number_from_, i.line_number_to_}; }
 
   template<typename T>
   auto map(interval<T> const& i) const {
